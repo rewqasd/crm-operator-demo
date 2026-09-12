@@ -191,7 +191,7 @@ class YunxiNavigationTests(UiAcceptanceTests):
         self.page.evaluate('Yunxi.ready')
         self.page.locator('[data-mode="yunxi"]').click()
 
-    def test_five_cards_expose_materials_and_navigate_to_honest_staged_pages(self):
+    def test_five_cards_expose_materials_and_navigate_to_distinct_workbenches(self):
         self.enter_yunxi()
         expected = {'cloud-card': '云名片', 'call-control': '呼叫控制', 'ai-analytics': 'AI 数析',
                     'ai-assistant': 'AI 助手', 'ai-sales': 'AI 助销'}
@@ -214,14 +214,16 @@ class YunxiNavigationTests(UiAcceptanceTests):
             elif product_id == 'call-control':
                 self.assertTrue(self.page.get_by_role('heading', name='呼叫控制策略台', exact=True).is_visible())
             else:
-                self.assertTrue(self.page.get_by_text('交互模块准备中', exact=True).is_visible())
+                title = {'ai-analytics': '团队通话经营看板', 'ai-assistant': '我的通话工作台',
+                         'ai-sales': '4S 店实时邀约台'}[product_id]
+                self.assertTrue(self.page.get_by_role('heading', name=title, exact=True).is_visible())
             self.assertEqual(self.page.locator('#mode-navigation .active').inner_text(), name)
             self.page.locator('#mode-navigation [data-yunxi-page="overview"]').click()
         content = self.page.locator('#main-content').inner_text()
         for forbidden in ('CRM 协同', '客户回写', '联合流程', 'AI 数悉', 'AI数悉'):
             self.assertNotIn(forbidden, content)
 
-    def test_initialization_navigation_and_staged_apis_preserve_both_domains(self):
+    def test_initialization_and_navigation_preserve_both_domains(self):
         self.page.evaluate('CRM.ready')
         # Preserve even formatting: no Yunxi operation may normalize CRM's stored bytes.
         self.page.evaluate('''() => localStorage.setItem('crm_operator_state_v4',
@@ -231,15 +233,11 @@ class YunxiNavigationTests(UiAcceptanceTests):
         self.enter_yunxi()
         result = self.page.evaluate('''() => {
             Yunxi.bind(); Yunxi.bind();
-            const methods = ['runAnalysis', 'generateAssistantOutput', 'startSalesCall',
-                'triggerSalesObjection', 'endSalesCall'];
-            const outcomes = methods.map(method => Yunxi[method]());
             Object.keys(Yunxi.pages).forEach(page => App.navigate('yunxi', page));
             App.navigate('yunxi', 'unknown');
-            return { outcomes, page: document.getElementById('app-shell').dataset.currentPage };
+            return { page: document.getElementById('app-shell').dataset.currentPage };
         }''')
         self.assertEqual(result['page'], 'overview')
-        self.assertTrue(all(item['status'] == 'not-implemented' for item in result['outcomes']))
         self.assertEqual(self.page.evaluate('JSON.stringify(localStorage)'), before)
         self.page.get_by_role('button', name='返回教学首页').click()
         self.page.locator('[data-mode="crm"]').click()
@@ -319,6 +317,215 @@ class YunxiCardAndControlTests(YunxiNavigationTests):
         self.assertIn('黑名单拦截', log.inner_text())
         self.assertIsNone(__import__('re').search(r'(?<!\d)1\d{10}(?!\d)',
                                                    self.page.locator('#main-content').inner_text()))
+
+
+class YunxiAiTests(UiAcceptanceTests):
+    def ai_page(self, page):
+        self.page.evaluate('Yunxi.ready')
+        self.page.evaluate('(page) => App.navigate("yunxi", page)', page)
+
+    def test_analytics_aggregates_fixed_team_samples_and_drills_to_masked_transcripts(self):
+        self.ai_page('ai-analytics')
+        self.assertTrue(self.page.get_by_role('button', name='启动批量分析').is_visible())
+        self.page.get_by_label('行业模型').select_option('automotive')
+        self.page.get_by_role('button', name='启动批量分析').click()
+        self.assertEqual(self.page.locator('[data-analysis-metric="total"]').inner_text(), '6')
+        self.assertEqual(self.page.locator('[data-analysis-metric="connection"]').inner_text(), '83.3%')
+        self.assertEqual(self.page.locator('[data-analysis-metric="effective"]').inner_text(), '60.0%')
+        self.assertEqual(self.page.locator('[data-staff-ranking] tbody tr').count(), 3)
+        self.assertIn('顾问甲（虚构）', self.page.locator('[data-staff-ranking] tbody tr').first.inner_text())
+        self.assertIn('88.0', self.page.locator('[data-staff-ranking] tbody tr').first.inner_text())
+        self.page.get_by_role('button', name='高意向 · 2', exact=True).click()
+        self.assertEqual(self.page.locator('[data-analysis-call]').count(), 2)
+        self.page.locator('[data-analysis-call]').first.get_by_role('button', name='查看转写').click()
+        self.assertIn('试驾', self.page.locator('[data-analysis-transcript]').inner_text())
+        self.assertIn('1**-****-', self.page.locator('[data-analysis-transcript]').inner_text())
+        metrics = self.page.locator('[data-analysis-dashboard]').inner_text()
+        self.page.get_by_role('button', name='启动批量分析').click()
+        self.assertEqual(self.page.locator('[data-analysis-dashboard]').inner_text(), metrics)
+
+    def test_analysis_failure_retry_keeps_job_and_filters_empty_period_honestly(self):
+        self.ai_page('ai-analytics')
+        self.assertTrue(self.page.get_by_label('演示分析失败').is_visible())
+        self.page.get_by_label('演示分析失败').check()
+        self.page.get_by_role('button', name='启动批量分析').click()
+        self.assertIn('失败', self.page.locator('[data-analysis-job]').inner_text())
+        failed_id = self.page.evaluate('App.yunxiState.get().analyses.at(-1).id')
+        self.page.reload()
+        self.ai_page('ai-analytics')
+        self.page.get_by_role('button', name='重试此任务').click()
+        self.assertEqual(self.page.evaluate('App.yunxiState.get().analyses.at(-1).id'), failed_id)
+        self.assertEqual(self.page.evaluate('App.yunxiState.get().analyses.length'), 1)
+        self.assertEqual(self.page.locator('[data-analysis-metric="total"]').inner_text(), '6')
+        self.page.get_by_label('分析开始日期').fill('2026-10-01')
+        self.page.get_by_label('分析结束日期').fill('2026-10-07')
+        self.page.get_by_role('button', name='启动批量分析').click()
+        self.assertIn('没有通话样本', self.page.locator('[data-analysis-job]').inner_text())
+        self.assertEqual(self.page.locator('[data-analysis-dashboard]').count(), 0)
+        self.page.get_by_label('分析标签 高意向', exact=True).uncheck()
+        self.page.get_by_label('分析标签 客户问题', exact=True).uncheck()
+        self.page.get_by_label('分析标签 员工评价', exact=True).uncheck()
+        self.page.get_by_role('button', name='启动批量分析').click()
+        self.assertIn('至少选择一个分析标签', self.page.locator('#toast-root').inner_text())
+
+    def test_analytics_model_and_tags_change_results_and_old_failed_job_can_be_retried(self):
+        self.ai_page('ai-analytics')
+        self.page.get_by_label('演示分析失败').check()
+        self.page.get_by_role('button', name='启动批量分析').click()
+        self.page.get_by_label('行业模型').select_option('enterprise')
+        self.page.get_by_label('分析标签 客户问题', exact=True).uncheck()
+        self.page.get_by_label('分析标签 员工评价', exact=True).uncheck()
+        self.page.get_by_role('button', name='启动批量分析').click()
+        self.assertEqual(self.page.locator('[data-analysis-metric="total"]').inner_text(), '2')
+        self.assertEqual(self.page.locator('[data-analysis-metric="connection"]').inner_text(), '50.0%')
+        self.assertEqual(self.page.locator('[data-analysis-metric="effective"]').inner_text(), '100.0%')
+        self.assertEqual(self.page.locator('[data-analysis-tag]').all_text_contents(), ['高意向 · 1'])
+        self.assertNotIn('平均评分', self.page.locator('[data-staff-ranking]').inner_text())
+        self.page.get_by_role('button', name='高意向 · 1').click()
+        self.page.get_by_role('button', name='查看转写').click()
+        self.assertIn('预算下周确认', self.page.locator('[data-analysis-transcript]').inner_text())
+        self.page.get_by_role('button', name='重试此任务').click()
+        self.assertIn('analysis-1', self.page.locator('[data-analysis-job]').inner_text())
+        self.assertEqual(self.page.locator('[data-analysis-metric="total"]').inner_text(), '6')
+        self.assertEqual(self.page.evaluate('App.yunxiState.get().analyses.length'), 2)
+        before = self.page.evaluate('JSON.stringify(App.yunxiState.get().analyses)')
+        self.page.get_by_label('分析开始日期').fill('2026-09-13')
+        self.page.get_by_role('button', name='启动批量分析').click()
+        self.assertIn('不能晚于', self.page.locator('#toast-root').inner_text())
+        self.assertEqual(self.page.evaluate('JSON.stringify(App.yunxiState.get().analyses)'), before)
+
+    def test_ai_invalid_transitions_are_atomic_and_sales_reload_continues_same_call(self):
+        self.ai_page('ai-sales')
+        result = self.page.evaluate('''() => {
+            const before = JSON.stringify(App.yunxiState.get());
+            const invalid = [Yunxi.generateAssistantOutput(), Yunxi.askAssistant('下一步'),
+                Yunxi.selectPersonalCall('missing'), Yunxi.triggerSalesObjection('价格高'),
+                Yunxi.endSalesCall()];
+            return { rejected: invalid.every(item => item.status === 'invalid'),
+                unchanged: before === JSON.stringify(App.yunxiState.get()) };
+        }''')
+        self.assertEqual(result, {'rejected': True, 'unchanged': True})
+        self.page.get_by_label('企业知识库').select_option('4s-demo')
+        self.page.get_by_label('选择潜客').select_option('prospect-b')
+        self.page.get_by_role('button', name='开始模拟呼出').click()
+        self.page.get_by_role('button', name='推进下一段转写').click()
+        self.assertIn('周末方便试驾', self.page.locator('[data-sales-transcript]').inner_text())
+        self.page.get_by_role('button', name='价格高', exact=True).click()
+        sales = self.page.evaluate('JSON.stringify(App.yunxiState.get().sales)')
+        self.page.reload()
+        self.ai_page('ai-sales')
+        self.assertEqual(self.page.evaluate('JSON.stringify(App.yunxiState.get().sales)'), sales)
+        self.assertTrue(self.page.get_by_label('企业知识库').is_disabled())
+        self.assertTrue(self.page.get_by_label('选择潜客').is_disabled())
+        result = self.page.evaluate('''() => {
+            const before = JSON.stringify(App.yunxiState.get());
+            const invalid = [Yunxi.configureSales({knowledgeBase: ''}), Yunxi.triggerSalesObjection('未知异议')];
+            Yunxi.startSalesCall();
+            return { rejected: invalid.every(item => item.status === 'invalid'),
+                unchanged: before === JSON.stringify(App.yunxiState.get()) };
+        }''')
+        self.assertEqual(result, {'rejected': True, 'unchanged': True})
+        self.page.get_by_role('button', name='结束模拟通话').click()
+        self.assertIn('意向待确认', self.page.locator('[data-sales-recap]').inner_text())
+        result = self.page.evaluate('''() => {
+            const before = JSON.stringify(App.yunxiState.get());
+            Yunxi.endSalesCall();
+            const result = Yunxi.triggerSalesObjection('价格高');
+            return { rejected: result.status === 'invalid', unchanged: before === JSON.stringify(App.yunxiState.get()) };
+        }''')
+        self.assertEqual(result, {'rejected': True, 'unchanged': True})
+
+    def test_assistant_personal_call_generates_contextual_output_and_preserves_source_on_failure(self):
+        self.ai_page('ai-assistant')
+        self.assertTrue(self.page.locator('[data-assistant-phone]').is_visible())
+        self.page.get_by_role('button', name='选择通话：云启商贸（虚构）').click()
+        transcript = self.page.locator('[data-assistant-transcript]').inner_text()
+        self.page.get_by_role('button', name='模拟播放录音').click()
+        self.assertIn('无真实音频', self.page.locator('[data-assistant-recording]').inner_text())
+        self.page.get_by_label('演示生成失败').check()
+        self.page.get_by_role('button', name='生成纪要和待办').click()
+        self.assertIn('生成失败', self.page.locator('[data-assistant-status]').inner_text())
+        self.assertEqual(self.page.locator('[data-assistant-transcript]').inner_text(), transcript)
+        self.assertTrue(self.page.locator('[data-assistant-recording]').is_visible())
+        self.page.get_by_role('button', name='生成纪要和待办').click()
+        output = self.page.locator('[data-assistant-output]').inner_text()
+        for text in ('模拟生成', '企业宽带', '待办', '风险', '9 月 14 日'):
+            self.assertIn(text, output)
+        self.page.get_by_label('询问当前通话').fill('下一步应该如何跟进？')
+        self.page.get_by_role('button', name='询问 AI').click()
+        self.assertIn('宽带方案', self.page.locator('[data-assistant-answer]').inner_text())
+        self.page.get_by_role('button', name='选择通话：星禾工作室（虚构）').click()
+        self.assertEqual(self.page.locator('[data-assistant-output]').count(), 0)
+        self.assertEqual(self.page.locator('[data-assistant-answer]').count(), 0)
+        self.page.get_by_label('询问当前通话').fill('下一步应该如何跟进？')
+        self.page.get_by_role('button', name='询问 AI').click()
+        self.assertIn('发票', self.page.locator('[data-assistant-answer]').inner_text())
+        self.assertNotIn('宽带方案', self.page.locator('[data-assistant-answer]').inner_text())
+        self.page.get_by_label('询问当前通话').fill('今天股市涨了吗？')
+        self.page.get_by_role('button', name='询问 AI').click()
+        self.assertIn('仅依据当前模拟通话', self.page.locator('[data-assistant-answer]').inner_text())
+
+    def test_sales_live_objections_require_knowledge_and_produce_distinct_scripts_and_recap(self):
+        self.ai_page('ai-sales')
+        self.assertTrue(self.page.get_by_role('button', name='开始模拟呼出').is_visible())
+        self.page.get_by_role('button', name='开始模拟呼出').click()
+        self.assertIn('先选择知识库', self.page.locator('#toast-root').inner_text())
+        self.assertEqual(self.page.locator('[data-sales-recommendation]').count(), 0)
+        self.page.get_by_label('企业知识库').select_option('4s-demo')
+        self.page.get_by_label('选择潜客').select_option('prospect-a')
+        self.page.get_by_role('button', name='开始模拟呼出').click()
+        self.assertIn('通话进行中', self.page.locator('[data-sales-status]').inner_text())
+        self.page.get_by_role('button', name='推进下一段转写').click()
+        self.assertIn('试驾', self.page.locator('[data-sales-transcript]').inner_text())
+        scripts = []
+        for objection, expected in [('价格高', '费用明细'), ('暂时没时间', '预约'),
+                                    ('担心售后', '保修'), ('置换', '评估'), ('试驾时间', '时段')]:
+            self.page.get_by_role('button', name=objection, exact=True).click()
+            script = self.page.locator('[data-sales-recommendation]').inner_text()
+            self.assertIn(expected, script)
+            self.assertIn('模拟推荐', script)
+            scripts.append(script)
+            self.assertIn(objection, self.page.locator('[data-sales-tags]').inner_text())
+        self.assertEqual(len(set(scripts)), 5)
+        self.page.get_by_role('button', name='结束模拟通话').click()
+        recap = self.page.locator('[data-sales-recap]').inner_text()
+        for text in ('模拟生成', '下一步', '试驾', '价格高', '置换'):
+            self.assertIn(text, recap)
+        self.assertTrue(self.page.get_by_role('button', name='价格高', exact=True).is_disabled())
+        self.page.reload()
+        self.ai_page('ai-sales')
+        self.assertEqual(self.page.locator('[data-sales-recap]').inner_text(), recap)
+
+    def test_ai_workflows_keep_crm_bytes_and_existing_card_control_and_never_request_external_services(self):
+        self.page.evaluate('CRM.ready')
+        self.page.evaluate('''() => {
+            localStorage.setItem('crm_operator_state_v4', JSON.stringify(App.crmState.get(), null, 2));
+            Yunxi.previewCard({shortName: '隔离测试企业', type: 'dynamic'});
+            Yunxi.saveCallPolicy({perNumberLimit: 3});
+        }''')
+        before = self.page.evaluate('localStorage.getItem("crm_operator_state_v4")')
+        preserved = self.page.evaluate('({card: App.yunxiState.get().cloudCard, policy: App.yunxiState.get().callPolicy})')
+        requests = []
+        self.page.on('request', lambda request: requests.append(request.url))
+        self.ai_page('ai-analytics')
+        self.assertTrue(self.page.get_by_role('button', name='启动批量分析').is_visible())
+        self.page.get_by_role('button', name='启动批量分析').click()
+        self.ai_page('ai-assistant')
+        self.page.get_by_role('button', name='选择通话：云启商贸（虚构）').click()
+        self.page.get_by_role('button', name='生成纪要和待办').click()
+        self.ai_page('ai-sales')
+        self.page.get_by_label('企业知识库').select_option('4s-demo')
+        self.page.get_by_role('button', name='开始模拟呼出').click()
+        self.page.get_by_role('button', name='价格高', exact=True).click()
+        self.page.get_by_role('button', name='结束模拟通话').click()
+        self.assertEqual(self.page.evaluate('localStorage.getItem("crm_operator_state_v4")'), before)
+        self.assertEqual(self.page.evaluate('({card: App.yunxiState.get().cloudCard, policy: App.yunxiState.get().callPolicy})'), preserved)
+        self.assertFalse(requests)
+        for width in (390, 1024, 1440):
+            self.page.set_viewport_size({'width': width, 'height': 900})
+            for page in ('ai-analytics', 'ai-assistant', 'ai-sales'):
+                self.ai_page(page)
+                self.assertTrue(self.page.evaluate('document.documentElement.scrollWidth <= innerWidth'), (width, page))
 
 
 class CrmFlowTests(UiAcceptanceTests):

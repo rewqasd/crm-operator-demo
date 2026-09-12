@@ -152,6 +152,51 @@ button:focus-visible, a:focus-visible { outline: 3px solid #63b1ff; outline-offs
 .call-log-list { display: grid; gap: 10px; margin: 16px 0 0; padding: 0; list-style: none; }
 .call-log-list li { display: grid; grid-template-columns: minmax(104px, .7fr) minmax(0, 1fr); gap: 5px 12px; padding: 12px; border-radius: 7px; background: #f6f9fc; }
 .call-log-list small { grid-column: 1 / -1; color: var(--muted); }
+.yunxi-ai-panel { padding: 24px; min-width: 0; overflow-wrap: anywhere; }
+.yunxi-ai-panel h4 { font-size: 16px; margin: 0 0 14px; }
+.yunxi-ai-panel h4:not(:first-child) { margin-top: 24px; }
+.yunxi-ai-panel p, .yunxi-ai-panel li { line-height: 1.8; }
+.yunxi-ai-panel .table-wrap { width: 100%; overflow-x: auto; }
+.yunxi-ai-panel table { border-collapse: collapse; width: 100%; min-width: 420px; font-size: 12px; }
+.yunxi-ai-panel th, .yunxi-ai-panel td { padding: 14px 12px; text-align: left; border-bottom: 1px solid var(--line); }
+.yunxi-ai-panel th { background: #f0f5fb; color: #42607d; }
+.yunxi-analysis-form { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; }
+.yunxi-analysis-form fieldset, .yunxi-analysis-form > p { grid-column: 1 / -1; }
+.yunxi-analysis-form fieldset { display: flex; flex-wrap: wrap; gap: 12px 28px; }
+.yunxi-ai-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 20px 0; }
+.yunxi-ai-metrics > div { padding: 20px; border-radius: 8px; background: #f0f5fb; min-width: 0; }
+.yunxi-ai-metrics span { display: block; font-size: 12px; color: var(--muted); }
+.yunxi-ai-metrics strong { display: block; font-size: clamp(23px, 3vw, 36px); color: #173b62; margin-top: 10px; }
+.yunxi-call-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: center; padding: 18px 0; border-top: 1px solid var(--line); }
+.yunxi-call-row p { font-size: 12px; margin-bottom: 0; color: var(--muted); }
+.yunxi-transcript { padding: 0; list-style: none; display: grid; gap: 10px; }
+.yunxi-transcript li { padding: 12px 15px; border-left: 3px solid #b6cddd; background: #f4f7fa; line-height: 1.8; font-size: 13px; overflow-wrap: anywhere; }
+.yunxi-assistant-phone { width: min(100%, 530px); justify-self: center; padding: 20px; border: 7px solid #193348; border-radius: 28px; background: #f7fafb; box-shadow: 0 10px 28px #19334817; min-width: 0; overflow-wrap: anywhere; }
+.yunxi-miniapp-bar { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0 15px; border-bottom: 1px solid var(--line); font-size: 13px; font-weight: 600; }
+.yunxi-note-entries { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; padding: 14px 0; font-size: 11px; text-align: center; }
+.yunxi-note-entries strong { color: #087861; }
+.yunxi-note-entries small { display: block; font-size: 9px; color: var(--muted); margin-top: 7px; }
+.yunxi-personal-history { display: grid; gap: 10px; }
+.yunxi-history-item { padding: 15px; border: 1px solid var(--line); border-radius: 12px; background: white; text-align: left; color: var(--text); cursor: pointer; min-width: 0; }
+.yunxi-history-item.selected { border-color: #168576; background: #edf8f4; }
+.yunxi-history-item strong, .yunxi-history-item span, .yunxi-history-item small { display: block; line-height: 1.8; }
+.yunxi-history-item span, .yunxi-history-item small { color: var(--muted); font-size: 11px; }
+.yunxi-personal-detail { margin-top: 24px; font-size: 12px; line-height: 1.8; }
+.yunxi-personal-detail h4 { font-size: 14px; }
+.yunxi-personal-detail .check-label { margin: 15px 0; }
+.yunxi-assistant-output, .yunxi-assistant-answer { margin: 18px 0; padding: 18px; background: #e9f5ee; border-radius: 12px; }
+.yunxi-personal-detail .yunxi-form { padding: 16px 0; }
+.yunxi-personal-detail input { min-width: 0; }
+.yunxi-sales-layout { display: grid; grid-template-columns: minmax(250px, .8fr) minmax(0, 1.4fr); gap: 20px; }
+.yunxi-sales-layout > .yunxi-form { align-content: start; min-width: 0; }
+.yunxi-sales-layout p, .yunxi-sales-layout details { line-height: 1.8; font-size: 12px; overflow-wrap: anywhere; }
+.yunxi-sales-layout details summary { cursor: pointer; color: var(--cyan); }
+.yunxi-sales-layout h4 { margin: 0; line-height: 1.7; }
+.yunxi-live-recommendation { margin-top: 20px; border-left: 4px solid #b98018; padding: 18px; background: #fff6e5; }
+.yunxi-live-recommendation small { color: #755b29; line-height: 1.8; }
+.yunxi-sales-recap { border-top: 3px solid #9b791f; }
+.yunxi-workbench .btn:disabled { opacity: .5; cursor: not-allowed; }
+.yunxi-workbench button:focus-visible, .yunxi-workbench summary:focus-visible { outline: 3px solid #63b1ff; outline-offset: 3px; }
 @media (max-width: 1050px) {
   #sidebar { width: 185px; }
   .topbar { padding: 20px 24px; }
@@ -162,6 +207,7 @@ button:focus-visible, a:focus-visible { outline: 3px solid #63b1ff; outline-offs
   .deal-chain { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .cloud-card-layout, .call-control-layout { grid-template-columns: 1fr; }
   .cloud-phone { min-height: 320px; }
+  .yunxi-sales-layout { grid-template-columns: 1fr; }
 }
 @media (max-width: 720px) {
   #app-shell { display: block; }
@@ -186,4 +232,9 @@ button:focus-visible, a:focus-visible { outline: 3px solid #63b1ff; outline-offs
   .crm-distribution > div { grid-template-columns: 115px 1fr 20px; }
   .deal-chain { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .crm-inline { flex-direction: column; align-items: stretch; }
+  .yunxi-analysis-form { grid-template-columns: 1fr; }
+  .yunxi-ai-panel { padding: 16px; }
+  .yunxi-ai-metrics { gap: 6px; }
+  .yunxi-ai-metrics > div { padding: 12px 8px; }
+  .yunxi-assistant-phone { padding: 13px; border-width: 5px; }
 }
