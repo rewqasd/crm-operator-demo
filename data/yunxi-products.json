@@ -1,0 +1,77 @@
+[
+  {
+    "id": "cloud-card",
+    "name": "云名片",
+    "positioning": "在主叫触达场景展示企业身份，帮助被叫识别来电主体。",
+    "audience": ["需要在预约、服务通知等合规通话中展示企业身份的门店与服务企业。"],
+    "before": ["核对企业身份、授权号码与展示文案，确认终端及平台支持条件。"],
+    "during": ["围绕模拟主叫号码，观察企业名称和身份信息的名片展示方式。"],
+    "after": ["对比不同终端的展示差异，核查文案是否清晰且符合授权范围。"],
+    "limitations": ["展示受被叫终端、系统、平台支持及审核等条件影响，并非所有来电均能显示。", "身份展示不等同于接通承诺，不保证接通率或营销效果；课堂预览不是实际网络下发。"],
+    "teachingPoints": ["区分企业身份展示与通话内容。", "用“能够识别谁在来电”解释价值，同时讲清终端和平台限制。"],
+    "sourceRefs": [
+      {"platform": "金山文档", "documentId": "mN4b1TgaJrMnYsVNp1qE1xJR5UqP66xF1", "title": "云犀白皮书", "verifiedAt": "2026-09-12"},
+      {"platform": "金山文档", "documentId": "AJDtCQpVMrMrBiZYtZWY1x3ELky3ZzALZ", "title": "云犀课程资料", "verifiedAt": "2026-09-12"}
+    ]
+  },
+  {
+    "id": "call-control",
+    "name": "呼叫控制",
+    "positioning": "通过频次、总量、时段与黑名单规则约束外呼行为，辅助规范通话管理。",
+    "audience": ["需要统一外呼规则、减少重复拨打与非约定时段触达的企业团队。"],
+    "before": ["明确单号码拨打频次、统计周期、外呼总量、允许时段及黑名单。"],
+    "during": ["逐项检查模拟拨打是否命中单号码频次、总量、时段或黑名单限制。"],
+    "after": ["查看允许或拦截的原因，复盘规则是否符合实际服务安排。"],
+    "limitations": ["规则控制不能保证不封号，也不能替代运营商、平台规则或合规管理。", "演示只说明本地规则判定，不发起真实外呼；业务授权、联系意愿与拒接要求仍需人工管理。"],
+    "teachingPoints": ["单号码频次与整体外呼总量是不同限制。", "用命中原因解释一次模拟拦截，避免把风控辅助说成效果保证。"],
+    "sourceRefs": [
+      {"platform": "金山文档", "documentId": "mN4b1TgaJrMnYsVNp1qE1xJR5UqP66xF1", "title": "云犀白皮书", "verifiedAt": "2026-09-12"},
+      {"platform": "金山文档", "documentId": "AJDtCQpVMrMrBiZYtZWY1x3ELky3ZzALZ", "title": "云犀课程资料", "verifiedAt": "2026-09-12"}
+    ]
+  },
+  {
+    "id": "ai-analytics",
+    "name": "AI 数析",
+    "positioning": "面向企业批量、多人通话管理，将通话信息整理为结构化标签和可钻取的分析看板。",
+    "audience": ["需要跨成员查看服务质量、需求分布及团队通话情况的企业管理人员。"],
+    "before": ["准备已授权、脱敏的多人模拟通话样本，明确时间范围和标签口径。"],
+    "during": ["按成员或标签观察批量通话看板，从汇总指标钻取到对应样本。"],
+    "after": ["结合原始通话证据复核标签和结论，形成团队辅导与服务改进讨论。"],
+    "limitations": ["分析依赖样本覆盖、录音质量与标签口径，不能以少量样本代表全部业务。", "标签和总结可能有误，应回到原始记录人工复核；教学看板不连接真实企业通话。"],
+    "teachingPoints": ["企业多人批量管理是核心，不与个人通话助手混为一谈。", "演示从看板到标签再到样本的钻取路径，并区分事实、推断和建议。"],
+    "sourceRefs": [
+      {"platform": "金山文档", "documentId": "NqzZzVds5rMSSFmjak1uxxDwRjHk5GcfE", "title": "AI 数析与 AI 助销体验资料", "verifiedAt": "2026-09-12"},
+      {"platform": "金山文档", "documentId": "mN4b1TgaJrMnYsVNp1qE1xJR5UqP66xF1", "title": "云犀白皮书", "verifiedAt": "2026-09-12"}
+    ]
+  },
+  {
+    "id": "ai-assistant",
+    "name": "AI 助手",
+    "positioning": "面向个人通话记录，以手机或小程序式界面辅助查看录音转写、摘要、待办与 AI 问答。",
+    "audience": ["需要整理本人授权通话内容、回顾沟通要点与跟进事项的一线人员。"],
+    "before": ["在个人通话列表选择一条教学记录，确认录音来源、授权及需要回顾的问题。"],
+    "during": ["在手机或小程序式界面阅读录音转写，查看摘要、待办，并围绕该通话提问。"],
+    "after": ["对照转写确认姓名、时间与承诺事项，人工校正摘要和待办。"],
+    "limitations": ["转写与问答可能遗漏或误解信息，不能把生成内容直接当作已确认事实。", "教学内容来自虚构脱敏样本，不调用真实录音、不代为执行待办，也不向其他业务系统写入。"],
+    "teachingPoints": ["聚焦个人单次通话，不代替企业多人分析看板。", "按通话记录、转写、摘要、待办、问答的顺序理解使用流程。"],
+    "sourceRefs": [
+      {"platform": "金山文档", "documentId": "jW7BFTQ1q1MDGvbHA1kWxx4oWwRCUnEH9", "title": "AI 助手资料", "verifiedAt": "2026-09-12"},
+      {"platform": "金山文档", "documentId": "AJDtCQpVMrMrBiZYtZWY1x3ELky3ZzALZ", "title": "云犀课程资料", "verifiedAt": "2026-09-12"}
+    ]
+  },
+  {
+    "id": "ai-sales",
+    "name": "AI 助销",
+    "positioning": "面向外呼沟通，以实时转写、知识库与话术推荐辅助销售人员回应问题，并整理标签和会后总结。",
+    "audience": ["需要在邀约、需求确认及异议沟通中获得知识辅助的销售团队，重点以汽车 4S 店教学情境展示。"],
+    "before": ["准备虚构 4S 店试驾邀约情境，核对车型、试驾安排等教学知识库内容。"],
+    "during": ["观察模拟外呼实时转写；面对价格、到店时间等异议，检索知识库并参考话术推荐。"],
+    "after": ["核查客户需求和异议标签，复核会后总结与约定事项，避免作出未经确认的承诺。"],
+    "limitations": ["知识库和推荐话术需人工核验，不保证销售转化，不代表自动成交或代替销售决策。", "课堂使用预设的 4S 店通话片段，不发起真实外呼、不连接真实知识库，也不代表实时模型识别效果。"],
+    "teachingPoints": ["用 4S 店试驾邀约串起实时转写、知识检索、话术建议、标签与总结。", "区分知识依据、推荐表达和客户真实承诺，建议由销售人员自行判断。"],
+    "sourceRefs": [
+      {"platform": "金山文档", "documentId": "xwJ64QXrK1MwVXw2a4UHrxr6AG96diBdg", "title": "AI 助销资料", "verifiedAt": "2026-09-12"},
+      {"platform": "金山文档", "documentId": "NqzZzVds5rMSSFmjak1uxxDwRjHk5GcfE", "title": "AI 数析与 AI 助销体验资料", "verifiedAt": "2026-09-12"}
+    ]
+  }
+]

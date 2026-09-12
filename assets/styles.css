@@ -113,6 +113,15 @@ button:focus-visible, a:focus-visible { outline: 3px solid #63b1ff; outline-offs
 .deal-chain > div { padding: 12px 8px; border: 1px solid var(--line); background: #f8fafc; border-radius: 6px; font-size: 12px; }
 .deal-chain > div.done { background: #eef7f0; border-color: #cbe3d1; }
 .deal-chain small { font-size: 10px; min-height: 35px; }
+.yunxi-products details { margin-bottom: 24px; }
+.yunxi-products summary { cursor: pointer; color: var(--cyan); padding: 10px 0; }
+.yunxi-products summary:focus-visible { outline: 3px solid #63b1ff; outline-offset: 3px; }
+.yunxi-materials { line-height: 1.8; overflow-wrap: anywhere; }
+.yunxi-materials dt { font-weight: 600; margin-top: 18px; }
+.yunxi-materials dd { margin: 6px 0 0; color: var(--muted); }
+.yunxi-materials ul { padding-left: 20px; margin: 0; }
+.yunxi-materials li + li { margin-top: 8px; }
+.yunxi-materials small { display: block; font-size: 11px; }
 @media (max-width: 1050px) {
   #sidebar { width: 185px; }
   .topbar { padding: 20px 24px; }
@@ -136,6 +145,9 @@ button:focus-visible, a:focus-visible { outline: 3px solid #63b1ff; outline-offs
   #app-shell[data-current-mode="crm"] #sidebar { display: block; }
   #app-shell[data-current-mode="crm"] #mode-navigation { display: flex; overflow-x: auto; text-align: left; }
   #app-shell[data-current-mode="crm"] .nav-item { white-space: nowrap; flex: 0 0 auto; }
+  #app-shell[data-current-mode="yunxi"] #sidebar { display: block; }
+  #app-shell[data-current-mode="yunxi"] #mode-navigation { display: flex; overflow-x: auto; text-align: left; }
+  #app-shell[data-current-mode="yunxi"] .nav-item { white-space: nowrap; flex: 0 0 auto; }
   .crm-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .crm-section { padding: 16px; }
   .crm-record-grid { grid-template-columns: 1fr; }

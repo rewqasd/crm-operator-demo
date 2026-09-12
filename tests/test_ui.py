@@ -73,7 +73,8 @@ class UiAcceptanceTests(unittest.TestCase):
         scripts = self.page.locator('script[src]').evaluate_all(
             '(nodes) => nodes.map(node => node.getAttribute("src"))'
         )
-        self.assertEqual(scripts, ['assets/js/state.js', 'assets/js/app.js', 'assets/js/crm.js'])
+        self.assertEqual(scripts, ['assets/js/state.js', 'assets/js/app.js', 'assets/js/crm.js',
+                                   'assets/js/yunxi.js'])
         for asset in ['assets/styles.css', *scripts]:
             self.assertEqual(self.page.request.get(self.url.replace('index.html', asset)).status, 200)
 
@@ -182,6 +183,81 @@ class UiAcceptanceTests(unittest.TestCase):
                 ))
                 self.assertTrue(self.page.locator('[data-mode="crm"]').is_visible())
                 self.assertTrue(self.page.locator('[data-mode="yunxi"]').is_visible())
+
+
+class YunxiNavigationTests(UiAcceptanceTests):
+    def enter_yunxi(self):
+        self.assertTrue(self.page.evaluate("typeof window.Yunxi === 'object'"), 'Yunxi module missing')
+        self.page.evaluate('Yunxi.ready')
+        self.page.locator('[data-mode="yunxi"]').click()
+
+    def test_five_cards_expose_materials_and_navigate_to_honest_staged_pages(self):
+        self.enter_yunxi()
+        expected = {'cloud-card': '云名片', 'call-control': '呼叫控制', 'ai-analytics': 'AI 数析',
+                    'ai-assistant': 'AI 助手', 'ai-sales': 'AI 助销'}
+        self.assertEqual(self.page.locator('[data-yunxi-product]').count(), 5)
+        self.assertEqual(self.page.locator('#mode-navigation [data-yunxi-page]').all_text_contents(),
+                         ['五项功能概览', *expected.values()])
+        for product_id, name in expected.items():
+            card = self.page.locator(f'[data-yunxi-product="{product_id}"]')
+            self.assertTrue(card.get_by_role('heading', name=name, exact=True).is_visible())
+            card.get_by_text('查看教学资料', exact=True).click()
+            for label in ('适用客户', '使用前', '使用中', '使用后', '能力边界', '教学要点', '资料依据'):
+                self.assertIn(label, card.inner_text())
+            self.assertIn('2026-09-12', card.inner_text())
+            self.assertEqual(card.locator('a[href]').count(), 0)
+            card.get_by_role('button', name=f'进入{name}教学页').click()
+            self.assertEqual(self.page.locator('#app-shell').get_attribute('data-current-page'), product_id)
+            self.assertTrue(self.page.get_by_role('heading', name=name, exact=True).is_visible())
+            self.assertTrue(self.page.get_by_text('交互模块准备中', exact=True).is_visible())
+            self.assertEqual(self.page.locator('#mode-navigation .active').inner_text(), name)
+            self.page.locator('#mode-navigation [data-yunxi-page="overview"]').click()
+        content = self.page.locator('#main-content').inner_text()
+        for forbidden in ('CRM 协同', '客户回写', '联合流程', 'AI 数悉', 'AI数悉'):
+            self.assertNotIn(forbidden, content)
+
+    def test_initialization_navigation_and_staged_apis_preserve_both_domains(self):
+        self.page.evaluate('CRM.ready')
+        # Preserve even formatting: no Yunxi operation may normalize CRM's stored bytes.
+        self.page.evaluate('''() => localStorage.setItem('crm_operator_state_v4',
+            JSON.stringify(App.crmState.get(), null, 2))''')
+        before = self.page.evaluate('JSON.stringify(localStorage)')
+        self.page.reload()
+        self.enter_yunxi()
+        result = self.page.evaluate('''() => {
+            Yunxi.bind(); Yunxi.bind();
+            const methods = ['previewCard', 'saveCallPolicy', 'simulateControlledCall',
+                'runAnalysis', 'generateAssistantOutput', 'startSalesCall',
+                'triggerSalesObjection', 'endSalesCall'];
+            const outcomes = methods.map(method => Yunxi[method]());
+            Object.keys(Yunxi.pages).forEach(page => App.navigate('yunxi', page));
+            App.navigate('yunxi', 'unknown');
+            return { outcomes, page: document.getElementById('app-shell').dataset.currentPage };
+        }''')
+        self.assertEqual(result['page'], 'overview')
+        self.assertTrue(all(item['status'] == 'not-implemented' for item in result['outcomes']))
+        self.assertEqual(self.page.evaluate('JSON.stringify(localStorage)'), before)
+        self.page.get_by_role('button', name='返回教学首页').click()
+        self.page.locator('[data-mode="crm"]').click()
+        self.page.get_by_role('heading', name='线索作战台', exact=True).wait_for()
+        self.assertEqual(self.page.locator('[data-crm-page]').count(), 9)
+
+    def test_yunxi_material_load_failure_is_visible_without_fabricated_cards(self):
+        self.page.route('**/data/yunxi-products.json', lambda route: route.fulfill(status=503, body='unavailable'))
+        self.page.reload()
+        self.enter_yunxi()
+        self.assertIn('资料加载失败', self.page.locator('#main-content').inner_text())
+        self.assertEqual(self.page.locator('[data-yunxi-product]').count(), 0)
+
+    def test_yunxi_navigation_and_sources_fit_narrow_viewport(self):
+        self.enter_yunxi()
+        for width in (390, 1024, 1440):
+            self.page.set_viewport_size({'width': width, 'height': 900})
+            self.page.locator('[data-yunxi-product="ai-sales"] summary').click()
+            self.assertTrue(self.page.evaluate('document.documentElement.scrollWidth <= innerWidth'))
+            self.page.locator('#mode-navigation [data-yunxi-page="ai-assistant"]').click()
+            self.assertTrue(self.page.evaluate('document.documentElement.scrollWidth <= innerWidth'))
+            self.page.locator('#mode-navigation [data-yunxi-page="overview"]').click()
 
 
 class CrmFlowTests(UiAcceptanceTests):

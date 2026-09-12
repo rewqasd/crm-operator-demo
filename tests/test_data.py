@@ -33,6 +33,35 @@ def read_json(relative_path):
 
 
 class DataContractTests(unittest.TestCase):
+    def test_yunxi_has_exactly_five_named_products(self):
+        self.assertTrue((ROOT / "data/yunxi-products.json").exists(), "云犀数据文件缺失")
+        products = read_json("data/yunxi-products.json")
+        self.assertEqual(len(products), 5)
+        self.assertEqual({item['id']: item['name'] for item in products}, {
+            'cloud-card': '云名片', 'call-control': '呼叫控制', 'ai-analytics': 'AI 数析',
+            'ai-assistant': 'AI 助手', 'ai-sales': 'AI 助销',
+        })
+        for forbidden in ('AI 数悉', 'AI数悉'):
+            self.assertNotIn(forbidden, json.dumps(products, ensure_ascii=False))
+
+    def test_yunxi_materials_have_complete_teaching_fields_and_verified_sources(self):
+        self.assertTrue((ROOT / "data/yunxi-products.json").exists(), "云犀数据文件缺失")
+        verified_ids = {
+            'jW7BFTQ1q1MDGvbHA1kWxx4oWwRCUnEH9', 'xwJ64QXrK1MwVXw2a4UHrxr6AG96diBdg',
+            'NqzZzVds5rMSSFmjak1uxxDwRjHk5GcfE', 'mN4b1TgaJrMnYsVNp1qE1xJR5UqP66xF1',
+            'Pmizux972xMDRGyCRACp1xJkMvnN7nhjs', 'AJDtCQpVMrMrBiZYtZWY1x3ELky3ZzALZ',
+        }
+        for product in read_json('data/yunxi-products.json'):
+            with self.subTest(product=product['id']):
+                for field in ('positioning', 'audience', 'before', 'during', 'after',
+                              'limitations', 'teachingPoints', 'sourceRefs'):
+                    self.assertTrue(product.get(field), field)
+                for source in product['sourceRefs']:
+                    self.assertIn(source['documentId'], verified_ids)
+                    self.assertEqual(source['verifiedAt'], '2026-09-12')
+                    self.assertEqual(source['platform'], '金山文档')
+                    self.assertNotIn('url', source)
+
     def test_required_data_files_exist(self):
         self.assertTrue((ROOT / "data/crm-leads.json").exists())
         self.assertTrue((ROOT / "data/yunxi-products.json").exists())

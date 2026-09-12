@@ -35,6 +35,8 @@
       main.replaceChildren(document.getElementById('home-template').content.cloneNode(true));
     } else if (mode === 'crm' && window.CRM) {
       CRM.render(page || 'dashboard');
+    } else if (mode === 'yunxi' && window.Yunxi) {
+      Yunxi.render(page || 'overview');
     } else {
       const heading = mode === 'crm' ? 'CRM' : '云犀功能演示';
       main.innerHTML = '<section class="panel module-placeholder"><p class="eyebrow">独立教学区域</p>' +
