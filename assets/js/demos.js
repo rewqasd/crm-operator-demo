@@ -108,11 +108,11 @@
   function yunxiSteps() {
     const s = (id, title, target, why, change, action) => step('yunxi', id, title, id, target, why, change, action);
     return [
-      s('cloud-card', '云名片：预览动态来电展示', '.yunxi-workbench',
+      s('cloud-card', '云名片：预览动态来电展示', '.cloud-phone',
         '先让客户识别企业身份；展示效果仍受终端、网络与配置约束。',
         '保存并预览一张虚构动态名片，只写入云犀教学状态。', () => Yunxi.previewCard({
           type: 'dynamic', shortName: '云启企服（虚构）', slogan: '企业服务教学演示', tags: '企业宽带, 上云服务', scene: 'renewal' })),
-      s('call-control', '呼叫控制：验证黑名单拦截', '.call-simulator',
+      s('call-control', '呼叫控制：验证黑名单拦截', '.call-log',
         '先配置频次、时段和黑名单，再验证规则，不绕过客户联系意愿。',
         '保存策略并产生一条脱敏号码拦截日志；没有真实呼出。', () => {
           Yunxi.saveCallPolicy({ perNumberLimit: 2, teamQuota: 6, startHour: 9, endHour: 18, blacklist: ['test-a'] });
@@ -124,7 +124,7 @@
           Yunxi.runAnalysis({ sourceId: 'guided-ai-analytics-v1', industry: 'automotive', start: '2026-09-10', end: '2026-09-12',
             tags: ['高意向', '客户问题', '员工评价'] })),
       s('ai-assistant', 'AI 助手：生成个人通话纪要与待办', '[data-assistant-output]',
-        '围绕一通个人历史通话整理下一步，输出需人工核对，不自动写入 CRM。',
+        '围绕一通个人历史通话整理下一步；纪要与待办仅为本地模拟输出，需人工核对。',
         '选择脱敏个人通话，生成固定纪要、风险和待办，并询问下一步。', () => {
           Yunxi.selectPersonalCall('personal-1'); Yunxi.generateAssistantOutput(); Yunxi.askAssistant('下一步应该如何跟进');
         }),
@@ -141,6 +141,9 @@
 
   function renderControls() {
     if (!session) return;
+    const focused = controls.contains(document.activeElement) ? document.activeElement : null;
+    const focusSelector = focused?.dataset.demoAction ? `[data-demo-action="${focused.dataset.demoAction}"]`
+      : focused?.matches('[data-demo-speed]') ? '[data-demo-speed]' : null;
     const current = session.steps[session.index];
     controls.hidden = false;
     controls.dataset.step = current.id;
@@ -150,6 +153,7 @@
       <p class="demo-replay-note">回看／重播不撤销已完成操作，也不重复新增；需要撤销时，退出并选择恢复演示前状态。</p>
       <div class="demo-buttons"><button class="btn" data-demo-action="toggle">${session.playing ? '暂停' : '播放'}</button><button class="btn" data-demo-action="previous" ${session.index === 0 ? 'disabled' : ''}>上一步</button><button class="btn" data-demo-action="next" ${session.index === session.steps.length - 1 ? 'disabled' : ''}>下一步</button><label>速度 <select aria-label="演示速度" data-demo-speed>${[0.75, 1, 1.5].map(rate => `<option value="${rate}" ${rate === session.speed ? 'selected' : ''}>${rate} 倍速</option>`).join('')}</select></label><button class="btn" data-demo-action="restart">重播</button><button class="btn" data-demo-action="exit">退出</button></div>`;
     document.body.classList.add('demo-active');
+    if (focusSelector) controls.querySelector(focusSelector)?.focus({ preventScroll: true });
   }
 
   function schedule() {

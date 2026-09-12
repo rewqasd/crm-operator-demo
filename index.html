@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="两个独立的教学模拟区域：运营商政企 CRM 与云犀功能演示。">
   <title>CRM 教学演示</title>
+  <meta name="theme-color" content="#17344f">
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
   <link rel="stylesheet" href="assets/styles.css">
   <script src="assets/js/state.js" defer></script>
   <script src="assets/js/app.js" defer></script>
@@ -13,6 +15,7 @@
   <script src="assets/js/demos.js" defer></script>
 </head>
 <body>
+  <a class="skip-link" href="#main-content">跳到主要内容</a>
   <div id="app-shell" data-current-mode="home">
     <aside id="sidebar" aria-label="教学导航">
       <div class="brand"><span class="brand-mark" aria-hidden="true">C</span><strong>CRM</strong></div>
@@ -25,6 +28,7 @@
       <header class="topbar">
         <h1>CRM 教学演示</h1>
         <button type="button" class="btn" data-demo-select>自动演示</button>
+        <button type="button" class="btn btn-reset" data-reset-domain hidden></button>
         <span class="simulation-badge">全站数据均为教学模拟</span>
       </header>
       <main id="main-content" tabindex="-1"></main>
@@ -34,7 +38,7 @@
     <section class="home-intro">
       <p class="eyebrow">教学工作台</p>
       <h2>选择一个教学场景</h2>
-      <p>CRM 业务流程与云犀产品功能分别演示，各自保存数据，互不联动或回写。</p>
+      <p>CRM 业务流程与云犀产品功能是两个独立教学区，各自保存、各自重置。</p>
     </section>
     <div class="mode-grid">
       <article class="mode-card">
@@ -48,7 +52,7 @@
         <span class="section-label">独立产品功能教学</span>
         <h3>云犀功能演示</h3>
         <p>认识云名片、呼叫控制、AI 数析、AI 助手和 AI 助销的使用场景。</p>
-        <div class="mode-preview">五项功能 · 独立数据<br><strong>聚焦产品能力与使用边界</strong><small>交互模块准备中，不连接 CRM</small></div>
+        <div class="mode-preview">五项功能 · 独立数据<br><strong>聚焦产品能力与使用边界</strong><small>手动体验 · 自动导览 · 模拟结果</small></div>
         <button type="button" class="btn btn-secondary" data-mode="yunxi">进入云犀功能演示 <span aria-hidden="true">→</span></button>
       </article>
     </div>

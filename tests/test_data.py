@@ -33,6 +33,22 @@ def read_json(relative_path):
 
 
 class DataContractTests(unittest.TestCase):
+    def test_shipping_content_has_no_private_data_or_unrelated_products(self):
+        shipping = [ROOT / 'index.html', ROOT / 'README.md']
+        shipping += [path for folder in ('assets', 'data') for path in (ROOT / folder).rglob('*')
+                     if path.suffix in {'.html', '.css', '.js', '.json'}]
+        forbidden = [r'AI\s*数悉', r'aTrust', r'\b(?:DNS|VPN|proxy)\b',
+                     r'远程(?:访问|接入|控制)', r'回写|回填|联动\s*CRM|CRM\s*联动|协同方案',
+                     r'(?<!\d)1[3-9]\d{9}(?!\d)',
+                     r'https?://(?:10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(?:1[6-9]|2\d|3[01])\.\d+\.\d+)',
+                     r'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----',
+                     r'\b(?:sk-[A-Za-z0-9]{20,}|gh[pousr]_[A-Za-z0-9]{20,})',
+                     r'''(?:password|api[_-]?key|secret|access[_-]?token)\s*[:=]\s*["'][^"']+["']''']
+        for path in shipping:
+            for pattern in forbidden:
+                with self.subTest(file=str(path.relative_to(ROOT)), pattern=pattern):
+                    self.assertIsNone(re.search(pattern, path.read_text(encoding='utf-8'), re.I))
+
     def test_yunxi_has_exactly_five_named_products(self):
         self.assertTrue((ROOT / "data/yunxi-products.json").exists(), "云犀数据文件缺失")
         products = read_json("data/yunxi-products.json")

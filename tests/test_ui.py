@@ -185,6 +185,122 @@ class UiAcceptanceTests(unittest.TestCase):
                 self.assertTrue(self.page.locator('[data-mode="yunxi"]').is_visible())
 
 
+class PolishAcceptanceTests(UiAcceptanceTests):
+    def test_subcent_amounts_are_rejected_without_mutating_business_state(self):
+        result = self.page.evaluate('''async () => {
+            await CRM.ready;
+            CRM.claimLead('TJHD-001'); CRM.logContact('TJHD-001', { connected: true });
+            const customer = CRM.convertLead('TJHD-001');
+            const before = localStorage.getItem('crm_operator_state_v4');
+            const rejected = [0.001, '0.004', 1e-10].map(amount => {
+                try { CRM.createOpportunity(customer.id, { amount }); return false; }
+                catch (error) { return localStorage.getItem('crm_operator_state_v4') === before; }
+            });
+            return { rejected, minimum: CRM.createOpportunity(customer.id, { amount: 0.01 }).amount };
+        }''')
+        self.assertEqual(result, {'rejected': [True, True, True], 'minimum': 0.01})
+
+    def test_exact_reset_controls_restore_only_their_own_domain(self):
+        self.page.evaluate('Promise.all([CRM.ready, Yunxi.ready])')
+        seeds = self.page.evaluate('JSON.stringify(localStorage)')
+        import json
+        seeds = json.loads(seeds)
+        for mode, key, other in [('crm', 'crm_operator_state_v4', 'yunxi_teaching_state_v1'),
+                                 ('yunxi', 'yunxi_teaching_state_v1', 'crm_operator_state_v4')]:
+            self.page.evaluate('''() => {
+                for (const domain of Object.values(App.domains)) {
+                    const data = domain.get(); data.acceptanceMarker = 'preserve outside reset'; domain.save(data);
+                }
+                localStorage.setItem('unrelated-teaching-data', 'preserve exactly');
+            }''')
+            before = self.page.evaluate('JSON.stringify(localStorage)')
+            self.page.evaluate('(mode) => App.navigate(mode)', mode)
+            label = '重置 CRM 教学数据' if mode == 'crm' else '重置云犀教学数据'
+            self.assertEqual(self.page.get_by_role('button', name=label, exact=True).count(), 1)
+            self.page.get_by_role('button', name=label, exact=True).click()
+            self.page.keyboard.press('Escape')
+            self.assertEqual(self.page.evaluate('JSON.stringify(localStorage)'), before)
+            self.page.get_by_role('button', name=label, exact=True).click()
+            self.page.get_by_role('button', name='确认重置', exact=True).click()
+            after = json.loads(self.page.evaluate('JSON.stringify(localStorage)'))
+            self.assertEqual(after[key], seeds[key])
+            self.assertEqual(after[other], json.loads(before)[other])
+            self.assertEqual(after['unrelated-teaching-data'], 'preserve exactly')
+
+    def test_modal_contains_focus_restores_trigger_and_disables_all_background(self):
+        self.page.evaluate("Demos.start('crm').then(() => Demos.pause())")
+        trigger = self.page.locator('#demo-controls').get_by_role('button', name='退出', exact=True)
+        trigger.click()
+        dialog = self.page.get_by_role('dialog')
+        self.assertEqual(dialog.get_attribute('aria-modal'), 'true')
+        for selector in ('#app-shell', '#demo-controls'):
+            self.assertTrue(self.page.locator(selector).evaluate('(el) => el.inert'))
+            self.assertEqual(self.page.locator(selector).get_attribute('aria-hidden'), 'true')
+        self.page.keyboard.press('Shift+Tab')
+        self.assertEqual(self.page.locator(':focus').inner_text(), '恢复演示前状态')
+        self.page.keyboard.press('Tab')
+        self.assertEqual(self.page.locator(':focus').get_attribute('aria-label'), '关闭弹窗')
+        for _ in range(8):
+            self.page.keyboard.press('Tab')
+            self.assertTrue(dialog.evaluate('(el) => el.contains(document.activeElement)'))
+        self.page.keyboard.press('Escape')
+        self.assertFalse(dialog.is_visible())
+        self.assertTrue(trigger.evaluate('(el) => el === document.activeElement'))
+        for selector in ('#app-shell', '#demo-controls'):
+            self.assertFalse(self.page.locator(selector).evaluate('(el) => el.inert'))
+            self.assertNotEqual(self.page.locator(selector).get_attribute('aria-hidden'), 'true')
+        self.assertEqual(self.page.evaluate('Demos.activeMode'), 'crm')
+
+    def test_projection_viewports_keep_pages_dialogs_and_demo_controls_operable(self):
+        self.page.evaluate('Promise.all([CRM.ready, Yunxi.ready])')
+        for width, height in [(1366, 768), (1024, 768), (720, 900)]:
+            self.page.set_viewport_size({'width': width, 'height': height})
+            for mode, pages in [('crm', ['dashboard', 'pool', 'deals']),
+                                ('yunxi', ['overview', 'cloud-card', 'call-control', 'ai-analytics', 'ai-assistant', 'ai-sales'])]:
+                for page in pages:
+                    self.page.evaluate('([mode, page]) => App.navigate(mode, page)', [mode, page])
+                    self.assertTrue(self.page.evaluate('document.body.scrollWidth === innerWidth'), (width, mode, page))
+                    self.assertTrue(self.page.locator('#mode-navigation').is_visible())
+            self.page.evaluate("App.navigate('crm', 'pool')")
+            self.page.locator('[data-lead-id="TJHD-001"] [data-action="profile"]').first.click()
+            box = self.page.get_by_role('dialog').bounding_box()
+            self.assertGreaterEqual(box['x'], 0)
+            self.assertLessEqual(box['x'] + box['width'], width)
+            self.assertLessEqual(box['y'] + box['height'], height)
+            self.page.keyboard.press('Escape')
+            self.page.evaluate("Demos.start('crm').then(() => Demos.pause())")
+            controls = self.page.locator('#demo-controls')
+            controls.get_by_role('button', name='下一步', exact=True).click()
+            self.assertTrue(self.page.evaluate('document.body.scrollWidth === innerWidth'))
+            self.assertTrue(self.page.locator('.demo-target').evaluate('''el => {
+                const target = el.getBoundingClientRect();
+                return target.top >= 0 && target.bottom <= document.querySelector('#demo-controls').getBoundingClientRect().top;
+            }'''))
+            controls.get_by_role('button', name='退出', exact=True).click()
+            self.page.get_by_role('button', name='保留结果', exact=True).click()
+
+    def test_keyboard_entry_and_branded_metadata_are_available(self):
+        self.assertTrue(self.page.locator('meta[name="description"]').get_attribute('content'))
+        self.assertEqual(self.page.locator('link[rel="icon"]').count(), 1)
+        self.page.keyboard.press('Tab')
+        self.assertEqual(self.page.locator(':focus').inner_text(), '跳到主要内容')
+        self.page.keyboard.press('Enter')
+        self.assertEqual(self.page.locator(':focus').get_attribute('id'), 'main-content')
+
+    def test_yunxi_demo_result_stays_above_the_control_bar_on_projection_sizes(self):
+        for width, height in [(1366, 768), (1024, 768), (720, 900)]:
+            self.page.set_viewport_size({'width': width, 'height': height})
+            self.page.evaluate("Demos.start('yunxi').then(() => Demos.pause())")
+            for step, selector in [('cloud-card', '.cloud-phone h4'), ('call-control', '.call-log-list li')]:
+                if step == 'call-control':
+                    self.page.locator('#demo-controls').get_by_role('button', name='下一步', exact=True).click()
+                self.assertTrue(self.page.locator(selector).first.evaluate('''el => {
+                    const box = el.getBoundingClientRect();
+                    return box.top >= 0 && box.bottom <= document.querySelector('#demo-controls').getBoundingClientRect().top;
+                }'''), (width, step))
+            self.page.evaluate('Demos.exit({restore: true})')
+
+
 class YunxiNavigationTests(UiAcceptanceTests):
     def enter_yunxi(self):
         self.assertTrue(self.page.evaluate("typeof window.Yunxi === 'object'"), 'Yunxi module missing')

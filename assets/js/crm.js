@@ -34,9 +34,9 @@
     return upsert(data, 'activities', { ...payload, id, leadId, type, text, at: new Date().toISOString() });
   }
   function amount(value) {
-    const number = Number(value);
+    const number = Math.round(Number(value) * 100) / 100;
     if (!Number.isFinite(number) || number <= 0) throw new Error('请输入大于零的教学金额');
-    return Math.round(number * 100) / 100;
+    return number;
   }
   function requireOwned(lead) {
     if (!lead.owner) throw new Error('请先领取或分配该线索');
