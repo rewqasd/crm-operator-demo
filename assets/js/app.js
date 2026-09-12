@@ -33,6 +33,8 @@
     nav.append(homeButton);
     if (mode === 'home') {
       main.replaceChildren(document.getElementById('home-template').content.cloneNode(true));
+    } else if (mode === 'crm' && window.CRM) {
+      CRM.render(page || 'dashboard');
     } else {
       const heading = mode === 'crm' ? 'CRM' : '云犀功能演示';
       main.innerHTML = '<section class="panel module-placeholder"><p class="eyebrow">独立教学区域</p>' +
@@ -92,6 +94,7 @@
     }
   });
 
-  window.App = Object.freeze({ navigate, openModal, closeModal, toast, domains });
+  window.App = Object.freeze({ navigate, openModal, closeModal, toast, domains,
+    crmState: domains.crm, yunxiState: domains.yunxi });
   navigate('home');
 }());

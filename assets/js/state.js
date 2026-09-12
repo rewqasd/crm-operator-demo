@@ -5,7 +5,10 @@
   const clone = value => JSON.parse(JSON.stringify(value));
 
   function createDomain(key, seed) {
-    const initial = clone(seed);
+    let initial = clone(seed);
+
+    // Update a fetched teaching seed without changing any saved business state.
+    function setSeed(value) { initial = clone(value); }
 
     function save(value) {
       const next = clone(value);
@@ -44,7 +47,7 @@
     }
 
     get(); // Initialize or recover only this domain's storage key.
-    return Object.freeze({ get, save, reset, snapshot: get, restore: save, upsert });
+    return Object.freeze({ get, save, reset, snapshot: get, restore: save, upsert, setSeed });
   }
 
   window.State = Object.freeze({ createDomain });

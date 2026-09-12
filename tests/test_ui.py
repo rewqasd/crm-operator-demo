@@ -73,7 +73,7 @@ class UiAcceptanceTests(unittest.TestCase):
         scripts = self.page.locator('script[src]').evaluate_all(
             '(nodes) => nodes.map(node => node.getAttribute("src"))'
         )
-        self.assertEqual(scripts, ['assets/js/state.js', 'assets/js/app.js'])
+        self.assertEqual(scripts, ['assets/js/state.js', 'assets/js/app.js', 'assets/js/crm.js'])
         for asset in ['assets/styles.css', *scripts]:
             self.assertEqual(self.page.request.get(self.url.replace('index.html', asset)).status, 200)
 
@@ -157,11 +157,12 @@ class UiAcceptanceTests(unittest.TestCase):
         before = self.page.evaluate('JSON.stringify(localStorage)')
         self.page.locator('[data-mode="crm"]').click()
         self.assertEqual(self.page.locator('#app-shell').get_attribute('data-current-mode'), 'crm')
-        self.assertIn('准备中', self.page.locator('#main-content').inner_text())
+        self.page.get_by_role('heading', name='线索作战台', exact=True).wait_for()
         self.page.get_by_role('button', name='返回教学首页').click()
         self.page.locator('[data-mode="yunxi"]').click()
         self.assertEqual(self.page.locator('#app-shell').get_attribute('data-current-mode'), 'yunxi')
-        self.assertEqual(self.page.evaluate('JSON.stringify(localStorage)'), before)
+        self.assertEqual(self.page.evaluate('localStorage.getItem("yunxi_teaching_state_v1")'),
+                         __import__('json').loads(before)['yunxi_teaching_state_v1'])
         self.page.evaluate('App.openModal("<p>教学说明</p>")')
         self.assertTrue(self.page.get_by_role('dialog').is_visible())
         self.page.keyboard.press('Escape')
@@ -181,3 +182,218 @@ class UiAcceptanceTests(unittest.TestCase):
                 ))
                 self.assertTrue(self.page.locator('[data-mode="crm"]').is_visible())
                 self.assertTrue(self.page.locator('[data-mode="yunxi"]').is_visible())
+
+
+class CrmFlowTests(UiAcceptanceTests):
+    def enter_crm(self, page='pool'):
+        self.assertTrue(self.page.evaluate("typeof window.CRM === 'object'"), 'CRM business module missing')
+        self.page.evaluate('CRM.ready')
+        self.page.evaluate('(page) => App.navigate("crm", page)', page)
+
+    def test_crm_navigation_default_and_claim_persists(self):
+        self.enter_crm('dashboard')
+        self.page.get_by_role('button', name='返回教学首页').click()
+        self.page.locator('[data-mode="crm"]').click()
+        self.assertTrue(self.page.get_by_role('heading', name='线索作战台', exact=True).is_visible())
+        self.assertEqual(self.page.locator('[data-crm-page]').all_text_contents(), [
+            '线索作战台', '天津河东客户公海', '我的线索', '线索分配与回收', '联系客户',
+            '跟进任务', '客户与商机', '成交管理', '经营分析'])
+        self.page.locator('[data-crm-page="pool"]').click()
+        self.assertEqual(self.page.locator('[data-pool-count]').inner_text(), '50')
+        self.page.locator('[data-lead-id="TJHD-001"] [data-action="claim"]').click()
+        self.assertEqual(self.page.locator('[data-pool-count]').inner_text(), '49')
+        self.page.reload()
+        self.enter_crm('mine')
+        self.assertEqual(self.page.locator('[data-lead-id="TJHD-001"]').count(), 1)
+        self.assertEqual(self.page.evaluate('App.crmState.get().leads.filter(l => !l.owner).length'), 49)
+        self.page.evaluate('App.crmState.reset(); CRM.render("pool")')
+        self.assertEqual(self.page.locator('[data-pool-count]').inner_text(), '50')
+
+    def test_crm_filters_assignment_recycle_duplicate_and_history(self):
+        self.enter_crm()
+        self.page.get_by_label('行业', exact=True).select_option('健身运动')
+        self.page.get_by_label('街道', exact=True).select_option('大王庄')
+        self.assertEqual(self.page.locator('tbody tr[data-lead-id]').count(), 1)
+        self.page.get_by_role('button', name='分配', exact=True).click()
+        self.page.get_by_label('客户经理').select_option('李经理（模拟）')
+        self.page.get_by_role('button', name='确认分配').click()
+        self.page.reload()
+        self.enter_crm('allocation')
+        row = self.page.locator('[data-lead-id="TJHD-001"]')
+        self.assertIn('李经理（模拟）', row.inner_text())
+        row.get_by_role('button', name='退回公海').click()
+        self.page.get_by_label('回收原因').fill('教学：联系计划变更')
+        self.page.get_by_role('button', name='确认回收').click()
+        self.assertEqual(self.page.evaluate('App.crmState.get().leads.filter(l => !l.owner).length'), 50)
+        self.assertIn('教学：联系计划变更', self.page.locator('#main-content').inner_text())
+        self.page.locator('[data-crm-page="pool"]').click()
+        self.page.get_by_role('button', name='线索查重').click()
+        self.page.get_by_label('企业名称或脱敏号码').fill('1**-****-1021')
+        self.page.get_by_role('button', name='开始查重').click()
+        self.assertIn('TJHD-001', self.page.get_by_role('dialog').inner_text())
+
+    def test_crm_linked_lifecycle_idempotence_and_domain_isolation(self):
+        self.enter_crm()
+        result = self.page.evaluate('''() => {
+            const other = localStorage.getItem('yunxi_teaching_state_v1');
+            const id = 'TJHD-001';
+            CRM.claimLead(id);
+            CRM.logContact(id, { connected: true, result: '需跟进', need: '企业宽带', objection: '预算', note: '首次联系', score: 92 });
+            const task = CRM.createTask(id, { title: 'T+2 方案沟通', dueDate: '2026-09-14' });
+            const customer = CRM.convertLead(id);
+            CRM.convertLead(id);
+            const opp = CRM.createOpportunity(customer.id, { amount: 12000, product: '企业宽带' });
+            CRM.createOpportunity(customer.id, { amount: 12000, product: '企业宽带' });
+            const quote = CRM.createQuote(opp.id, { amount: 12000 });
+            CRM.createQuote(opp.id, { amount: 12000 });
+            const contract = CRM.createContract(opp.id, {});
+            CRM.createContract(opp.id, {});
+            const order = CRM.createOrder(contract.id, {});
+            CRM.createOrder(contract.id, {});
+            const payment = CRM.registerPayment(order.id, { amount: 12000 });
+            CRM.registerPayment(order.id, { amount: 12000 });
+            CRM.closeOpportunity(opp.id);
+            const state = App.crmState.get();
+            return { state, task, customer, opp, quote, contract, order, payment,
+                     isolated: other === localStorage.getItem('yunxi_teaching_state_v1') };
+        }''')
+        self.assertTrue(result['isolated'])
+        for collection in ('customers', 'opportunities', 'quotes', 'contracts', 'orders', 'payments', 'tasks'):
+            self.assertEqual(len(result['state'][collection]), 1, collection)
+        for key in ('task', 'customer', 'opp', 'quote', 'contract', 'order', 'payment'):
+            self.assertEqual(result[key]['leadId'], 'TJHD-001', key)
+        for key in ('opp', 'quote', 'contract', 'order', 'payment'):
+            self.assertEqual(result[key]['amount'], 12000, key)
+        self.assertEqual(result['quote']['opportunityId'], result['opp']['id'])
+        self.assertEqual(result['contract']['quoteId'], result['quote']['id'])
+        self.assertEqual(result['order']['contractId'], result['contract']['id'])
+        self.assertEqual(result['payment']['orderId'], result['order']['id'])
+        self.assertEqual(result['state']['opportunities'][0]['status'], '赢单')
+        self.assertEqual(result['state']['leads'][0]['score'], 92)
+
+    def test_crm_contact_ui_and_modal_keyboard_access(self):
+        self.enter_crm()
+        trigger = self.page.locator('[data-lead-id="TJHD-001"] [data-action="contact"]')
+        trigger.click()
+        dialog = self.page.get_by_role('dialog')
+        self.assertIn('1**-****-1021', dialog.inner_text())
+        self.assertNotIn('云犀', dialog.inner_text())
+        self.assertTrue(self.page.locator('#app-shell').evaluate('(e) => e.inert'))
+        self.page.keyboard.press('Shift+Tab')
+        self.assertTrue(dialog.evaluate('(e) => e.contains(document.activeElement)'))
+        self.page.keyboard.press('Tab')
+        self.assertEqual(self.page.locator(':focus').get_attribute('aria-label'), '关闭弹窗')
+        self.page.keyboard.press('Escape')
+        self.assertTrue(trigger.evaluate('(e) => e === document.activeElement'))
+        trigger.click()
+        self.page.get_by_role('button', name='开始模拟拨号').click()
+        self.assertIn('模拟呼叫中', dialog.inner_text())
+        self.page.get_by_role('button', name='模拟接通').click()
+        self.page.get_by_label('客户需求').fill('企业宽带升级')
+        self.page.get_by_label('沟通备注').fill('约定两天后提交方案')
+        self.page.get_by_role('button', name='保存联系记录').click()
+        self.assertEqual(self.page.evaluate('App.crmState.get().activities.filter(a => a.type === "contact").length'), 1)
+        self.assertEqual(self.page.evaluate('App.crmState.get().tasks.length'), 1)
+
+    def test_crm_untouched_shell_migrates_and_markerless_edits_survive(self):
+        self.enter_crm()
+        self.page.evaluate('''() => {
+            const blank = Object.fromEntries(['leads','customers','opportunities','tasks','quotes','contracts','orders','payments','activities'].map(k => [k, []]));
+            App.crmState.save(blank);
+            window.otherBefore = localStorage.getItem('yunxi_teaching_state_v1');
+        }''')
+        other = self.page.evaluate('window.otherBefore')
+        self.page.reload()
+        self.enter_crm()
+        self.assertEqual(self.page.evaluate('App.crmState.get().leads.length'), 50)
+        self.assertEqual(self.page.evaluate('localStorage.getItem("yunxi_teaching_state_v1")'), other)
+        self.page.evaluate('''() => {
+            const data = App.crmState.get(); delete data.datasetVersion;
+            data.leads[0].owner = '李经理（模拟）'; data.leads[0].status = '需跟进';
+            App.crmState.save(data);
+        }''')
+        before = self.page.evaluate('localStorage.getItem("crm_operator_state_v4")')
+        self.page.reload()
+        self.enter_crm('allocation')
+        self.assertEqual(self.page.evaluate('localStorage.getItem("crm_operator_state_v4")'), before)
+        self.page.evaluate('App.crmState.reset()')
+        self.assertEqual(self.page.evaluate('App.crmState.get().leads.filter(l => !l.owner).length'), 50)
+
+    def test_crm_batch_claim_search_sort_task_completion_and_viewports(self):
+        self.enter_crm()
+        self.page.get_by_label('排序', exact=True).select_option('score-desc')
+        self.assertEqual(self.page.locator('tbody tr').first.get_attribute('data-lead-id'), 'TJHD-019')
+        self.page.locator('input[name="lead-selection"]').nth(0).check()
+        self.page.locator('input[name="lead-selection"]').nth(1).check()
+        self.page.get_by_role('button', name='批量领取', exact=True).click()
+        self.assertEqual(self.page.locator('[data-pool-count]').inner_text(), '48')
+        self.page.get_by_label('关键词', exact=True).fill('康悦口腔')
+        self.page.get_by_role('button', name='搜索', exact=True).click()
+        self.assertEqual(self.page.locator('tbody tr').count(), 1)
+        self.page.get_by_role('button', name='清空筛选').click()
+        self.page.evaluate('CRM.createTask("TJHD-019", { title: "确认方案", dueDate: "2026-09-14" }); App.navigate("crm", "tasks")')
+        self.page.get_by_role('button', name='标记完成', exact=True).click()
+        self.assertEqual(self.page.evaluate('App.crmState.get().tasks[0].status'), '已完成')
+        for width in (390, 720, 1024, 1366):
+            self.page.set_viewport_size({'width': width, 'height': 900})
+            self.page.evaluate('App.navigate("crm", "pool")')
+            self.assertTrue(self.page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), width)
+
+    def test_crm_full_lifecycle_through_visible_controls(self):
+        self.enter_crm()
+        self.page.locator('[data-lead-id="TJHD-001"] [data-action="contact"]').click()
+        self.page.get_by_role('button', name='开始模拟拨号').click()
+        self.page.get_by_role('button', name='模拟接通').click()
+        self.page.get_by_label('沟通备注').fill('教学：确认网络升级需求')
+        self.page.get_by_role('button', name='保存联系记录').click()
+        self.page.locator('[data-crm-page="mine"]').click()
+        self.page.get_by_role('button', name='画像', exact=True).click()
+        self.page.get_by_role('button', name='转为客户', exact=True).click()
+        self.page.locator('[data-crm-page="customers"]').click()
+        self.page.get_by_role('button', name='创建商机', exact=True).click()
+        self.page.get_by_label('预计金额').fill('24000')
+        self.page.get_by_role('button', name='保存商机').click()
+        self.page.get_by_role('button', name='进入成交管理').click()
+        self.page.get_by_role('button', name='生成报价', exact=True).click()
+        self.page.get_by_role('button', name='确认报价', exact=True).click()
+        self.page.get_by_role('button', name='建立合同').click()
+        self.page.get_by_role('button', name='建立订单').click()
+        self.page.get_by_role('button', name='登记回款').click()
+        self.page.get_by_role('button', name='保存回款').click()
+        self.page.get_by_role('button', name='确认赢单').click()
+        self.assertIn('已赢单', self.page.locator('#main-content').inner_text())
+        self.assertEqual(self.page.evaluate('App.crmState.get().payments[0].amount'), 24000)
+        self.page.reload()
+        self.enter_crm('deals')
+        self.assertIn('已赢单', self.page.locator('#main-content').inner_text())
+
+    def test_crm_invalid_transitions_are_atomic_and_won_amount_stays_consistent(self):
+        self.enter_crm()
+        result = self.page.evaluate('''() => {
+            const errors = [];
+            function rejected(action) {
+                const before = JSON.stringify(App.crmState.get());
+                try { action(); return false; }
+                catch (error) { errors.push(error.message); return before === JSON.stringify(App.crmState.get()); }
+            }
+            const unowned = rejected(() => CRM.convertLead('TJHD-001'));
+            CRM.claimLead('TJHD-001');
+            const uncontacted = rejected(() => CRM.convertLead('TJHD-001'));
+            CRM.logContact('TJHD-001', { id: 'first-call', connected: true, need: '企业宽带' });
+            CRM.logContact('TJHD-001', { id: 'first-call', connected: true, need: '企业宽带' });
+            const customer = CRM.convertLead('TJHD-001');
+            const invalidAmount = rejected(() => CRM.createOpportunity(customer.id, { amount: -1 }));
+            const opp = CRM.createOpportunity(customer.id, { amount: 12000 });
+            const missingQuote = rejected(() => CRM.createContract(opp.id));
+            CRM.createQuote(opp.id); const contract = CRM.createContract(opp.id); const order = CRM.createOrder(contract.id);
+            const overpaid = rejected(() => CRM.registerPayment(order.id, { amount: 12001 }));
+            CRM.registerPayment(order.id, { amount: 6000 });
+            const underpaid = rejected(() => CRM.closeOpportunity(opp.id));
+            CRM.registerPayment(order.id, { amount: 12000 }); CRM.closeOpportunity(opp.id);
+            const wonReduced = rejected(() => CRM.registerPayment(order.id, { amount: 6000 }));
+            return { unowned, uncontacted, invalidAmount, missingQuote, overpaid, underpaid, wonReduced,
+                contacts: App.crmState.get().activities.filter(a => a.type === 'contact').length };
+        }''')
+        self.assertEqual(result, {'unowned': True, 'uncontacted': True, 'invalidAmount': True,
+                                 'missingQuote': True, 'overpaid': True, 'underpaid': True,
+                                 'wonReduced': True, 'contacts': 1})

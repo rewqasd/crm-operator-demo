@@ -52,12 +52,75 @@ button:focus-visible, a:focus-visible { outline: 3px solid #63b1ff; outline-offs
 .toast { background: var(--navy); color: white; padding: 14px 20px; border-radius: 9px; box-shadow: 0 6px 24px #10263e26; }
 .toast.success { background: var(--green); }
 .toast.error { background: var(--red); }
+.crm-heading h2 { margin: 8px 0 18px; font-size: 28px; }
+.crm-disclaimer { padding: 12px 16px; border-left: 3px solid #ca9d3d; background: #fff8e7; font-size: 12px; line-height: 1.8; margin-bottom: 22px; }
+.crm-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 22px; }
+.crm-kpi { padding: 18px; }
+.crm-kpi span { color: var(--muted); font-size: 12px; }
+.crm-kpi strong { display: block; margin-top: 10px; font-size: clamp(21px, 2.5vw, 34px); overflow-wrap: anywhere; }
+.crm-section { padding: 22px; margin-bottom: 20px; min-width: 0; }
+.crm-section h3 { margin: 0 0 16px; font-size: 17px; }
+.crm-section > p, .crm-record p { color: var(--muted); line-height: 1.7; }
+.crm-two-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.crm-next, .crm-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.crm-next h3 { font-size: 22px; }
+.crm-distribution > div { display: grid; grid-template-columns: 140px 1fr 24px; align-items: center; gap: 12px; margin-top: 14px; font-size: 12px; }
+.crm-distribution meter { width: 100%; height: 14px; accent-color: var(--blue); }
+.crm-filters { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.crm-filters label, .crm-form label, .crm-inline label { display: flex; flex-direction: column; gap: 7px; color: var(--muted); font-size: 12px; min-width: 0; }
+.crm-filters .search-label { flex: 1 1 250px; }
+.crm-filters input, .crm-filters select, .crm-form input, .crm-form select, .crm-form textarea, .crm-inline select { border: 1px solid #bdcbd9; border-radius: 6px; padding: 10px; color: var(--text); background: #fff; min-width: 0; max-width: 100%; }
+.crm-form textarea { resize: vertical; min-height: 70px; }
+.crm-toolbar { margin: 14px 0; }
+.crm-toolbar > div { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn-small { padding: 8px 10px; gap: 7px; font-size: 12px; }
+.table-scroll { overflow-x: auto; max-width: 100%; }
+.crm-table { border-collapse: collapse; width: 100%; min-width: 920px; font-size: 12px; }
+.crm-table th { text-align: left; background: #f0f5fb; color: #42607d; font-weight: 600; }
+.crm-table th, .crm-table td { padding: 14px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.crm-table th:first-child { width: 42px; }
+.crm-table td:nth-child(2) { min-width: 185px; }
+.crm-table td:last-child { min-width: 154px; }
+.crm-table small, .crm-record small { display: block; color: var(--muted); line-height: 1.8; margin-top: 6px; overflow-wrap: anywhere; }
+.crm-table tbody tr:hover { background: #f7faff; }
+.text-button { border: 0; background: transparent; padding: 0; color: #175896; text-align: left; font-weight: 600; line-height: 1.7; }
+.signal-cell { min-width: 175px; line-height: 1.8; }
+.score { font-size: 18px; font-weight: 700; }
+.score.high { color: var(--green); }
+.status-pill { background: #eef4fb; border-radius: 4px; padding: 4px 7px; font-size: 12px; display: inline-block; white-space: nowrap; }
+.row-actions { display: flex; gap: 7px; flex-wrap: wrap; }
+.empty-state { padding: 28px 12px; color: var(--muted); line-height: 1.8; text-align: center; background: #f7f9fc; border-radius: 8px; }
+.crm-form { display: grid; gap: 16px; }
+.crm-form h3, .crm-form p { margin: 0; line-height: 1.7; }
+.crm-form .form-error { color: var(--red); }
+.crm-profile dl { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 12px; line-height: 1.8; }
+.crm-profile dt { color: var(--muted); }
+.crm-profile dd { margin: 0; overflow-wrap: anywhere; }
+.crm-profile h3 { margin-top: 30px; }
+.crm-drawer { height: calc(100vh - 40px); max-height: calc(100vh - 40px); margin-left: auto; width: min(640px, 100%); }
+.crm-timeline { padding: 0 0 0 20px; }
+.crm-timeline li { padding: 0 0 20px 9px; border-left: 1px solid var(--line); line-height: 1.7; }
+.crm-timeline small, .crm-timeline strong { display: block; }
+.crm-timeline small { color: var(--muted); font-size: 11px; }
+.crm-timeline strong { font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
+.crm-timeline p { margin: 5px 0; font-size: 12px; }
+.crm-inline { display: flex; gap: 12px; align-items: end; margin-bottom: 28px; }
+.crm-inline label { flex: 1; }
+.crm-record-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; }
+.crm-record { padding: 18px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 14px; min-width: 0; overflow-wrap: anywhere; }
+.crm-record h3 { line-height: 1.6; }
+.deal-chain { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 18px 0; }
+.deal-chain > div { padding: 12px 8px; border: 1px solid var(--line); background: #f8fafc; border-radius: 6px; font-size: 12px; }
+.deal-chain > div.done { background: #eef7f0; border-color: #cbe3d1; }
+.deal-chain small { font-size: 10px; min-height: 35px; }
 @media (max-width: 1050px) {
   #sidebar { width: 185px; }
   .topbar { padding: 20px 24px; }
   #main-content { padding: 28px 24px; }
   .mode-grid { gap: 16px; }
   .mode-card { padding: 22px; }
+  .crm-two-columns { grid-template-columns: 1fr; gap: 0; }
+  .deal-chain { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 720px) {
   #app-shell { display: block; }
@@ -70,4 +133,13 @@ button:focus-visible, a:focus-visible { outline: 3px solid #63b1ff; outline-offs
   #main-content { padding: 24px 20px; }
   .mode-grid { grid-template-columns: 1fr; }
   .mode-card > p { min-height: auto; }
+  #app-shell[data-current-mode="crm"] #sidebar { display: block; }
+  #app-shell[data-current-mode="crm"] #mode-navigation { display: flex; overflow-x: auto; text-align: left; }
+  #app-shell[data-current-mode="crm"] .nav-item { white-space: nowrap; flex: 0 0 auto; }
+  .crm-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .crm-section { padding: 16px; }
+  .crm-record-grid { grid-template-columns: 1fr; }
+  .crm-distribution > div { grid-template-columns: 115px 1fr 20px; }
+  .deal-chain { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .crm-inline { flex-direction: column; align-items: stretch; }
 }
