@@ -43,6 +43,14 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .brand { display: flex; align-items: center; gap: 12px; min-height: 88px; padding: 20px 24px; border-bottom: 1px solid #ffffff1f; font-size: 24px; color: white; }
 .brand-mark { display: grid; place-items: center; background: var(--blue); width: 34px; height: 34px; border-radius: 9px; font-size: 20px; }
 #mode-navigation { flex: 1; padding: 20px 12px; }
+.nav-domain { margin-bottom: 16px; }
+.nav-domain-heading { width: 100%; padding: 12px 10px; text-align: left; color: #c3d7ea; background: transparent; border: 0; font-size: 12px; font-weight: 600; }
+.nav-domain[data-nav-domain="yunxi"] { padding-top: 12px; border-top: 3px solid #72bcb1; }
+.nav-domain[data-nav-domain="yunxi"] .nav-domain-heading { color: #b9e2dc; }
+.yunxi-card-summary { margin: 0 0 16px; }
+.yunxi-card-summary dt { margin-top: 12px; font-weight: 600; font-size: 13px; }
+.yunxi-card-summary dd { margin: 6px 0 0; color: var(--muted); }
+.yunxi-card-summary ul { margin: 0; padding-left: 20px; }
 .nav-item { width: 100%; text-align: left; border: 0; border-radius: 8px; background: transparent; color: inherit; padding: 13px 15px; }
 .nav-item:hover { background: #244767; color: white; }
 .nav-item.active { background: #315778; color: white; box-shadow: inset 3px 0 #a9c8e9; font-weight: 600; }
@@ -162,7 +170,10 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .yunxi-form, .call-simulator, .call-log { padding: 22px; }
 .yunxi-form { display: grid; gap: 15px; }
 .yunxi-form label, .call-simulator label { display: grid; gap: 7px; color: var(--muted); font-size: 12px; }
-.yunxi-form input, .yunxi-form select, .call-simulator input, .call-simulator select { width: 100%; border: 1px solid #bdcbd9; border-radius: 6px; padding: 10px; color: var(--text); background: white; }
+.yunxi-form input, .yunxi-form select, .yunxi-form textarea, .call-simulator input, .call-simulator select { width: 100%; min-width: 0; border: 1px solid #bdcbd9; border-radius: 6px; padding: 10px; color: var(--text); background: white; }
+.yunxi-form textarea { min-height: 96px; resize: vertical; }
+.yunxi-knowledge-editor form { display: grid; gap: 14px; }
+.yunxi-knowledge-editor { overflow-wrap: anywhere; min-width: 0; }
 .yunxi-form small { color: var(--muted); line-height: 1.6; }
 .yunxi-form fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 0; padding: 11px; }
 .yunxi-form legend { padding: 0 5px; color: var(--muted); font-size: 12px; }
@@ -174,6 +185,8 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .cloud-phone strong { color: var(--cyan); font-size: 14px; }
 .cloud-phone h4 { margin: 16px 0 10px; font-size: 30px; overflow-wrap: anywhere; }
 .cloud-phone > p { line-height: 1.8; }
+.cloud-dynamic { margin-top: 20px; padding: 18px; border: 1px solid #91b8dd; border-radius: 12px; background: white; }
+.cloud-dynamic small { color: var(--muted); }
 .cloud-tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0; }
 .cloud-tags span { padding: 6px 9px; border-radius: 5px; color: #295b8c; background: #dce8f5; font-size: 13px; }
 .cloud-disclaimer { margin-top: 40px; color: var(--muted); font-size: 12px; }
@@ -245,9 +258,11 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 }
 @media (max-width: 720px) {
   #app-shell { display: block; }
-  #sidebar { width: 100%; flex-direction: row; align-items: center; }
+  #sidebar { width: 100%; display: block; }
   .brand { min-height: 64px; padding: 12px 16px; border: 0; font-size: 20px; }
-  #mode-navigation { padding: 8px; text-align: right; }
+  #mode-navigation { padding: 8px; text-align: left; }
+  .nav-domain { margin-bottom: 8px; overflow-x: auto; white-space: nowrap; }
+  .nav-domain-heading { width: auto; display: inline-block; }
   .nav-item { width: auto; }
   .sidebar-note { display: none; }
   .topbar { padding: 18px 20px; gap: 10px; }
@@ -256,10 +271,10 @@ button:disabled { cursor: not-allowed; opacity: .5; }
   .mode-grid { grid-template-columns: 1fr; }
   .mode-card > p { min-height: auto; }
   #app-shell[data-current-mode="crm"] #sidebar { display: block; }
-  #app-shell[data-current-mode="crm"] #mode-navigation { display: flex; overflow-x: auto; text-align: left; }
+  #app-shell[data-current-mode="crm"] #mode-navigation { display: block; text-align: left; }
   #app-shell[data-current-mode="crm"] .nav-item { white-space: nowrap; flex: 0 0 auto; }
   #app-shell[data-current-mode="yunxi"] #sidebar { display: block; }
-  #app-shell[data-current-mode="yunxi"] #mode-navigation { display: flex; overflow-x: auto; text-align: left; }
+  #app-shell[data-current-mode="yunxi"] #mode-navigation { display: block; text-align: left; }
   #app-shell[data-current-mode="yunxi"] .nav-item { white-space: nowrap; flex: 0 0 auto; }
   .crm-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .crm-section { padding: 16px; }

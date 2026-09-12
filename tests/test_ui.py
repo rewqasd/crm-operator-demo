@@ -262,7 +262,7 @@ class PolishAcceptanceTests(UiAcceptanceTests):
                     self.assertTrue(self.page.evaluate('document.body.scrollWidth === innerWidth'), (width, mode, page))
                     self.assertTrue(self.page.locator('#mode-navigation').is_visible())
             self.page.evaluate("App.navigate('crm', 'pool')")
-            self.page.locator('[data-lead-id="TJHD-001"] [data-action="profile"]').first.click()
+            self.page.locator('[data-lead-id="TJHD-019"] [data-action="profile"]').first.click()
             box = self.page.get_by_role('dialog').bounding_box()
             self.assertGreaterEqual(box['x'], 0)
             self.assertLessEqual(box['x'] + box['width'], width)
@@ -387,12 +387,16 @@ class YunxiCardAndControlTests(YunxiNavigationTests):
         self.page.get_by_label('品牌语').fill('让服务更近一步')
         self.page.get_by_label('服务标签').fill('企业宽带, 上云服务')
         self.page.get_by_label('外呼场景').select_option('renewal')
-        self.page.get_by_label('终端情境').select_option('unsupported')
+        self.page.get_by_label('终端情境').select_option('supported')
         self.page.get_by_role('button', name='更新手机预览').click()
         preview = self.page.locator('[data-cloud-card-preview]')
         for text in ('动态名片（教学模拟）', '云启企服', '让服务更近一步',
                      '企业宽带', '上云服务', '续约关怀', '教学模拟，不代表实际终端展示结果'):
             self.assertIn(text, preview.inner_text())
+        self.page.get_by_label('终端情境').select_option('unsupported')
+        self.page.get_by_role('button', name='更新手机预览').click()
+        self.assertIn('普通来电', preview.inner_text())
+        self.assertNotIn('云启企服', preview.inner_text())
         limitations = self.page.locator('[data-card-limitations]')
         self.assertTrue(limitations.is_visible())
         self.assertIn('不支持展示', limitations.inner_text())
@@ -727,7 +731,7 @@ class DemoPlayerTests(UiAcceptanceTests):
         state = result['state']
         for collection in ('customers', 'opportunities', 'tasks', 'quotes', 'contracts', 'orders', 'payments'):
             self.assertEqual(len(state[collection]), 1, collection)
-            self.assertEqual(state[collection][0]['leadId'], 'TJHD-001')
+            self.assertEqual(state[collection][0]['leadId'], 'TJHD-019')
         self.assertEqual(state['opportunities'][0]['status'], '赢单')
         self.assertEqual(state['payments'][0]['amount'], 12000)
         self.assertEqual(state['tasks'][0]['customerId'], state['customers'][0]['id'])
@@ -870,7 +874,7 @@ class DemoPlayerTests(UiAcceptanceTests):
                     const order = ['pool', 'filter', 'claim', 'contact', 'follow-up', 'customer',
                         'opportunity', 'quote', 'contract', 'order', 'payment', 'win'];
                     for (let i = 1; i < order.indexOf(target); i++) Demos.next();
-                    const lead = App.crmState.get().leads.find(item => item.id === 'TJHD-001');
+                    const lead = App.crmState.get().leads.find(item => item.id === 'TJHD-019');
                     if (!lead.customerId) CRM.assignLead(lead.id, '李经理（模拟）');
                     else App.crmState.upsert('leads', { ...lead, owner: '李经理（模拟）' });
                     const before = localStorage.getItem('crm_operator_state_v4');
@@ -927,7 +931,7 @@ class DemoPlayerTests(UiAcceptanceTests):
         self.page.clock.install()
         self.page.evaluate('''async () => {
             await CRM.ready;
-            CRM.assignLead('TJHD-001', '李经理（模拟）');
+            CRM.assignLead('TJHD-019', '李经理（模拟）');
             await Demos.start('crm');
         }''')
         self.page.clock.fast_forward(19000)

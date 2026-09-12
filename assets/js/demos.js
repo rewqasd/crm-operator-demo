@@ -4,9 +4,9 @@
   const labels = Object.freeze({ crm: 'CRM 线索成交演示', yunxi: '云犀五项功能导览' });
   const controls = document.getElementById('demo-controls');
   const durationMs = 240000;
-  const leadId = 'TJHD-001';
-  const contactId = 'DEMO-CONTACT-TJHD-001';
-  const taskId = 'DEMO-TASK-TJHD-001';
+  const leadId = 'TJHD-019';
+  const contactId = 'DEMO-CONTACT-' + leadId;
+  const taskId = 'DEMO-TASK-' + leadId;
   let session = null;
   let timer = null;
   let pending = 0;
@@ -52,7 +52,7 @@
       if (node.name) node.value = node.name === 'sort' ? 'id' : '';
     }
     if (filtered) {
-      form.elements.industry.value = '健身运动';
+      form.elements.industry.value = '汽车4S及服务';
       form.elements.score.value = '85';
       form.elements.sort.value = 'score-desc';
     }
@@ -64,15 +64,15 @@
     return [
       s('pool', '进入天津河东客户公海', 'pool', '.crm-kpis',
         '先识别可领取线索，明确公海与个人归属。', '只查看，不改变业务记录。', () => {}, () => filterPool(false)),
-      s('filter', '筛选健身行业的 85 分以上线索', 'pool', '#crm-filters',
-        '结合行业与机会评分确定优先联系对象。', '只改变列表筛选；锁定 TJHD-001 虚构样本。', () => {}, () => filterPool(true)),
-      s('claim', '领取 TJHD-001 到我的线索', 'mine', '[data-lead-id="TJHD-001"]',
+      s('filter', '筛选汽车4S及服务行业的 85 分以上线索', 'pool', '#crm-filters',
+        '结合汽车展厅经营需求与机会评分确定优先联系对象。', '只改变列表筛选；锁定 93 分的 TJHD-019 路驰新能源汽车（模拟）体验馆。', () => {}, () => filterPool(true)),
+      s('claim', '领取 TJHD-019 到我的线索', 'mine', '[data-lead-id="TJHD-019"]',
         '指定责任人，领取后再联系。', '归属当前模拟客户经理；重复领取不再新建记录。', () => CRM.claimLead(leadId)),
       s('contact', '记录首次模拟联系与需求', 'contact', '.crm-record',
         '先取得沟通许可，确认网络需求，不把拨号等同于有效联系。',
-        '记录已接通、企业宽带需求、预算待核实；不拨打真实电话。', () => {
+        '记录已接通、汽车展厅专线与组网需求、预算待核实；不拨打真实电话。', () => {
           if (!has('activities', contactId)) CRM.logContact(leadId, { id: contactId, connected: true,
-            need: '企业宽带 + 工作手机', objection: '预算待核实', note: '教学模拟：确认需求，约定 T+2 方案沟通', score: 90 });
+            need: '专线 + 组网', objection: '预算待核实', note: '教学模拟：确认汽车多区域展厅组网需求，约定 T+2 方案沟通', score: 93 });
         }),
       s('follow-up', '安排 T+2 需求确认跟进', 'tasks', '.crm-section',
         '把下一步变成有日期、责任人的可执行任务；此处不假装时间已经过去。',
@@ -83,9 +83,9 @@
         '有效沟通后建立客户档案，保留来源线索与跟进关系。', '新增一个客户并关联原跟进任务。', () => {
           if (!has('customers', 'CUS-' + leadId)) CRM.convertLead(leadId);
         }),
-      s('opportunity', '建立企业宽带商机', 'customers', '.crm-section',
+      s('opportunity', '建立汽车展厅专线与组网商机', 'customers', '.crm-section',
         '把需求拆成可管理的产品、金额和销售阶段。', '创建一条 12,000 元的模拟商机。', () =>
-          CRM.createOpportunity('CUS-' + leadId, { product: '企业宽带 + 工作手机', amount: 12000 })),
+          CRM.createOpportunity('CUS-' + leadId, { product: '专线 + 组网', amount: 12000 })),
       s('quote', '生成教学报价', 'deals', '.crm-section',
         '先明确产品和报价，再进入签约。', '报价与商机关联；金额为课堂示例，并非实际资费。', () => CRM.createQuote('OPP-' + leadId)),
       s('contract', '生成模拟合同', 'deals', '.crm-section',

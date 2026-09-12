@@ -8,7 +8,8 @@
       quotes: [], contracts: [], orders: [], payments: [], activities: []
     }),
     yunxi: State.createDomain('yunxi_teaching_state_v1', {
-      cloudCard: {}, callPolicy: {}, analyses: [], assistant: {}, sales: {}
+      cloudCard: {}, callPolicy: {}, callCounters: {}, callLogs: [], callSimulator: {},
+      analyses: [], assistant: {}, sales: {}, salesKnowledge: {}
     })
   });
 
@@ -22,6 +23,56 @@
   const resetButton = document.querySelector('[data-reset-domain]');
   const modalBackground = [shell, document.getElementById('demo-controls'), document.querySelector('.skip-link')];
 
+  function preserveFocus(root) {
+    const focused = document.activeElement;
+    if (!root.contains(focused)) return () => {};
+    const attributes = [...focused.attributes].filter(attr =>
+      attr.name === 'id' || attr.name === 'name' || attr.name.startsWith('data-'));
+    let selector = focused.tagName.toLowerCase() + attributes.map(attr =>
+      `[${attr.name}="${CSS.escape(attr.value)}"]`).join('');
+    if (focused.matches('input[type="checkbox"], input[type="radio"]')) selector += `[value="${CSS.escape(focused.value)}"]`;
+    const start = focused.selectionStart;
+    const end = focused.selectionEnd;
+    return fallback => {
+      const equivalent = attributes.length ? root.querySelector(selector) : null;
+      const target = equivalent && !equivalent.disabled ? equivalent : root.querySelector(fallback || 'h2');
+      if (!target) return;
+      if (!target.matches('button, input, select, textarea, a[href], summary')) target.tabIndex = -1;
+      target.focus({ preventScroll: true });
+      if (target === equivalent && typeof start === 'number' && target.setSelectionRange) target.setSelectionRange(start, end);
+    };
+  }
+
+  function renderNavigation(mode = shell.dataset.currentMode, page = shell.dataset.currentPage) {
+    const restoreFocus = preserveFocus(nav);
+    nav.replaceChildren();
+    for (const [domain, module, label] of [
+      ['crm', window.CRM, 'CRM · 业务流程教学'], ['yunxi', window.Yunxi, '云犀 · 产品教学模拟']
+    ]) {
+      const group = document.createElement('section');
+      group.className = 'nav-domain'; group.dataset.navDomain = domain;
+      const heading = document.createElement('button');
+      heading.type = 'button'; heading.className = 'nav-domain-heading';
+      heading.dataset.mode = domain; heading.textContent = label;
+      group.append(heading);
+      Object.entries(module?.pages || {}).forEach(([id, title]) => {
+        const button = document.createElement('button');
+        const current = mode === domain && page === id;
+        button.type = 'button'; button.className = 'nav-item' + (current ? ' active' : '');
+        button.dataset[domain + 'Page'] = id; button.textContent = title;
+        if (current) button.setAttribute('aria-current', 'page');
+        group.append(button);
+      });
+      nav.append(group);
+    }
+    const homeButton = document.createElement('button');
+    homeButton.type = 'button'; homeButton.className = 'nav-item' + (mode === 'home' ? ' active' : '');
+    homeButton.dataset.home = ''; homeButton.textContent = mode === 'home' ? '教学首页' : '返回教学首页';
+    if (mode === 'home') homeButton.setAttribute('aria-current', 'page');
+    nav.append(homeButton);
+    restoreFocus();
+  }
+
   function navigate(mode = 'home', page = '') {
     if (!['home', 'crm', 'yunxi'].includes(mode)) mode = 'home';
     if (window.Demos?.activeMode && Demos.activeMode !== mode) {
@@ -33,14 +84,7 @@
     shell.dataset.currentPage = page;
     resetButton.hidden = mode === 'home';
     resetButton.textContent = mode === 'crm' ? '重置 CRM 教学数据' : '重置云犀教学数据';
-    nav.replaceChildren();
-    const homeButton = document.createElement('button');
-    homeButton.type = 'button';
-    homeButton.className = 'nav-item' + (mode === 'home' ? ' active' : '');
-    homeButton.dataset.home = '';
-    homeButton.textContent = mode === 'home' ? '教学首页' : '返回教学首页';
-    if (mode === 'home') homeButton.setAttribute('aria-current', 'page');
-    nav.append(homeButton);
+    renderNavigation(mode, page);
     if (mode === 'home') {
       main.replaceChildren(document.getElementById('home-template').content.cloneNode(true));
     } else if (mode === 'crm' && window.CRM) {
@@ -48,7 +92,7 @@
     } else if (mode === 'yunxi' && window.Yunxi) {
       Yunxi.render(page || 'overview');
     } else {
-      const heading = mode === 'crm' ? 'CRM' : '云犀功能演示';
+      const heading = mode === 'crm' ? '线索作战台' : '云犀功能演示';
       main.innerHTML = '<section class="panel module-placeholder"><p class="eyebrow">独立教学区域</p>' +
         '<h2>' + heading + '</h2><p role="alert">教学模块未能加载，请检查本地文件后刷新页面。</p></section>';
     }
@@ -122,7 +166,7 @@
     }
   });
 
-  window.App = Object.freeze({ navigate, openModal, closeModal, toast, domains,
+  window.App = Object.freeze({ navigate, renderNavigation, preserveFocus, openModal, closeModal, toast, domains,
     crmState: domains.crm, yunxiState: domains.yunxi });
-  navigate('home');
+  document.addEventListener('DOMContentLoaded', () => navigate('crm', 'dashboard'), { once: true });
 }());

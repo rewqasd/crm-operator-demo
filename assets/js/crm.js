@@ -301,10 +301,9 @@
     activePage = Object.hasOwn(pages, page) ? page : 'dashboard';
     const shell = document.getElementById('app-shell');
     shell.dataset.currentPage = activePage;
-    document.querySelectorAll('[data-crm-page]').forEach(node => node.remove());
-    document.getElementById('mode-navigation').insertAdjacentHTML('beforeend', Object.entries(pages).map(([key, label]) =>
-      `<button class="nav-item ${key === activePage ? 'active' : ''}" data-crm-page="${key}" ${key === activePage ? 'aria-current="page"' : ''}>${label}</button>`).join(''));
+    App.renderNavigation('crm', activePage);
     const main = document.getElementById('main-content');
+    const restoreFocus = App.preserveFocus(main);
     if (!loaded) { main.innerHTML = `<section class="panel crm-section"><h2>${pages[activePage]}</h2><p role="status">${e(loadError || '正在载入 50 家教学企业…')}</p></section>`; return; }
     const data = dataNow();
     let content = '';
@@ -321,6 +320,7 @@
     else if (activePage === 'deals') content = dealsPage(data);
     else content = analyticsPage(data);
     main.innerHTML = `<div class="crm-heading"><p class="eyebrow">CRM · 天津市河东区 · 独立教学数据</p><h2>${pages[activePage]}</h2></div><p class="crm-disclaimer">本页企业、联系人、号码、经营情况、需求与评分均为课堂模拟，不代表真实企业信息或真实销售机会。</p>${content}`;
+    restoreFocus();
   }
 
   function openForm(title, body, submitLabel, onSubmit) {

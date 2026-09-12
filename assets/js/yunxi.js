@@ -6,7 +6,6 @@
     'ai-assistant': 'AI 助手', 'ai-sales': 'AI 助销' });
   const shell = document.getElementById('app-shell');
   const main = document.getElementById('main-content');
-  const nav = document.getElementById('mode-navigation');
   const e = value => String(value ?? '').replace(/[&<>"']/g, char =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   const fields = { audience: '适用客户', before: '使用前', during: '使用中', after: '使用后',
@@ -20,7 +19,11 @@
   const policyDefaults = Object.freeze({ perNumberLimit: 2, teamQuota: 6,
     startHour: 9, endHour: 18, blacklist: [] });
   const callNumbers = Object.freeze({ 'test-a': '1**-****-1021', 'test-b': '1**-****-3098' });
-  let callCounters = Object.create(null);
+  const callEmployees = Object.freeze({
+    'staff-a': { name: '顾问甲（虚构）', number: '1**-****-5101' },
+    'staff-b': { name: '顾问乙（虚构）', number: '1**-****-5102' }
+  });
+  const cardQualifications = '教学模拟：展示受被叫终端、系统版本、运营商支持、行业准入及业务配置影响；行业准入、身份授权与实际办理条件需核验，以审核及实际办理结果为准，不保证显示或接通。';
 
   const industryModels = { automotive: '汽车', education: '教育', beauty: '美容', enterprise: '企业服务' };
   const analysisTags = ['高意向', '客户问题', '员工评价'];
@@ -61,6 +64,7 @@
     '试驾时间': { source: 'QA-05 · 试驾预约', text: '请告诉我方便的试驾时段，例如周六下午；我会核实车辆和接待安排，确认后再发预约信息。', next: '核实可用试驾时段并请客户确认，尚未预约成功。' }
   };
   let analysisDrill = { tag: '', callId: '' };
+  let salesQaSelection = '价格高';
 
   // Teaching reference data is read-only; this foundation never reads or writes CRM state.
   const ready = fetch('data/yunxi-products.json').then(response => {
@@ -70,7 +74,10 @@
     const ids = Object.keys(pages).filter(id => id !== 'overview');
     if (!Array.isArray(data) || data.length !== ids.length ||
         !ids.every(id => data.filter(product => product.id === id && product.name === pages[id]).length === 1) ||
-        !data.every(product => typeof product.positioning === 'string' && product.positioning.trim() &&
+        !data.every(product => ['positioning', 'customerProblem', 'applicableScenario'].every(field =>
+          typeof product[field] === 'string' && product[field].trim()) &&
+          Array.isArray(product.coreCapabilities) && product.coreCapabilities.length === 3 &&
+          product.coreCapabilities.every(value => typeof value === 'string' && value.trim()) &&
           Object.keys(fields).every(field => Array.isArray(product[field]) && product[field].length &&
             product[field].every(value => typeof value === 'string' && value.trim())) &&
           Array.isArray(product.sourceRefs) && product.sourceRefs.length &&
@@ -113,6 +120,8 @@
     return {
       perNumberLimit: integer(value.perNumberLimit, policyDefaults.perNumberLimit, 1),
       teamQuota: integer(value.teamQuota, policyDefaults.teamQuota, 1),
+      employeeQuotas: Object.fromEntries(Object.keys(callEmployees).map(id => [id,
+        integer(value.employeeQuotas?.[id], policyDefaults.teamQuota, 1)])),
       startHour: integer(value.startHour, policyDefaults.startHour, 0) % 24,
       endHour: integer(value.endHour, policyDefaults.endHour, 0) % 24,
       blacklist: Array.isArray(value.blacklist) ? value.blacklist.filter(id => Object.hasOwn(callNumbers, id)) : []
@@ -142,6 +151,7 @@
     if (!form) return policyState(yunxiData().callPolicy);
     return policyState({
       perNumberLimit: form.elements.perNumberLimit.value, teamQuota: form.elements.teamQuota.value,
+      employeeQuotas: Object.fromEntries(Object.keys(callEmployees).map(id => [id, form.elements['quota-' + id].value])),
       startHour: form.elements.startHour.value, endHour: form.elements.endHour.value,
       blacklist: [...form.querySelectorAll('input[name="blacklist"]:checked')].map(node => node.value)
     });
@@ -167,34 +177,42 @@
           <button type="button" class="btn btn-primary" data-action="preview-card">更新手机预览</button>
         </form>
         <section class="cloud-phone" data-cloud-card-preview aria-label="手机名片预览">
-          <span class="cloud-phone-speaker"></span><p class="cloud-phone-status">模拟来电 · ${e(sceneName(card.scene))}</p><strong>${e(cardTypeName(card.type))}</strong><h4>${e(card.shortName)}</h4><p>${e(card.slogan)}</p><div class="cloud-tags">${tags.map(tag => `<span>${e(tag)}</span>`).join('')}</div>
+          <span class="cloud-phone-speaker"></span><p class="cloud-phone-status">模拟来电</p>
+          ${unsupported ? '<section data-ordinary-call><strong>普通来电（教学模拟）</strong><h4>1**-****-5101</h4><p>未显示企业名片</p></section>' :
+            `<section data-card-identity><strong>${e(cardTypeName(card.type))}</strong><h4>${e(card.shortName)}</h4><p>企业身份 · 1**-****-5101</p></section>` +
+            (card.type === 'dynamic' ? `<section class="cloud-dynamic" data-card-dynamic><strong>场景展示 · ${e(sceneName(card.scene))}</strong><p>${e(card.slogan)}</p><div class="cloud-tags">${tags.map(tag => `<span>${e(tag)}</span>`).join('')}</div><small>动态内容分区 · 非实际网络效果</small></section>` : '<p>静态身份展示：仅显示企业简称与号码。</p>')}
           <p class="cloud-disclaimer">教学模拟，不代表实际终端展示结果。</p>
-          ${unsupported ? '<p class="cloud-limit" data-card-limitations>当前选择的终端情境不支持展示名片，可能仅显示普通来电信息；实际效果以终端、网络和业务配置为准。</p>' : '<p class="cloud-limit" data-card-limitations hidden>终端限制说明</p>'}
+          ${unsupported ? '<p class="cloud-limit" data-card-limitations>当前终端情境不支持展示名片，退化为普通来电信息。</p>' : '<p class="cloud-limit" data-card-limitations hidden>终端限制说明</p>'}
         </section>
       </div>
+      <p class="cloud-limit" data-card-qualifications>${e(cardQualifications)}</p>
     </section>`;
   }
 
   function logsMarkup(logs) {
     if (!logs.length) return '<p class="empty-state">尚无模拟呼叫记录。</p>';
-    return `<ol class="call-log-list">${logs.map(log => `<li><strong>${e(log.number)}</strong><span>${e(log.reason)}</span><small>规则：${e(log.rule)} · 模拟时间：${e(log.at)}</small></li>`).join('')}</ol>`;
+    return `<ol class="call-log-list">${logs.map(log => `<li><strong>${e(log.number)}</strong><span>${e(log.reason)}</span><small>员工：${e(callEmployees[log.employeeId]?.name || '顾问甲（虚构）')} · ${e(callEmployees[log.employeeId]?.number || callEmployees['staff-a'].number)}<br>规则：${e(log.rule)} · 模拟时间：${e(log.at)}</small></li>`).join('')}</ol>`;
   }
 
   function callControlModule() {
     const state = yunxiData();
     const policy = policyState(state.callPolicy);
     const logs = Array.isArray(state.callLogs) ? state.callLogs.slice(-8).reverse() : [];
+    const simulator = state.callSimulator || {};
+    const at = simulator.at || '2026-09-12T10:00';
+    const daily = state.callCounters?.[simulatedMoment(at).day] || {};
     return `<section class="yunxi-workbench" data-yunxi-stage="call-control">
       <div class="yunxi-workbench-heading"><h3>呼叫控制策略台</h3><p>固定脱敏测试号码；这里不会发起真实呼叫。</p></div>
       <div class="call-control-layout"><form class="panel yunxi-form" data-call-policy-form>
         <label>单号码日上限<input name="perNumberLimit" aria-label="单号码日上限" type="number" min="1" value="${policy.perNumberLimit}"></label>
         <label>团队日配额<input name="teamQuota" aria-label="团队日配额" type="number" min="1" value="${policy.teamQuota}"></label>
+        ${Object.entries(callEmployees).map(([id, employee]) => `<label>${employee.name.slice(0, 3)}日配额<input name="quota-${id}" aria-label="${employee.name.slice(0, 3)}日配额" type="number" min="1" value="${policy.employeeQuotas[id]}"></label>`).join('')}
         <label>允许开始时段<select name="startHour" aria-label="允许开始时段">${Array.from({ length: 24 }, (_, hour) => `<option value="${hour}"${hour === policy.startHour ? ' selected' : ''}>${String(hour).padStart(2, '0')}:00</option>`).join('')}</select></label>
         <label>允许结束时段<select name="endHour" aria-label="允许结束时段">${Array.from({ length: 24 }, (_, hour) => `<option value="${hour}"${hour === policy.endHour ? ' selected' : ''}>${String(hour).padStart(2, '0')}:00</option>`).join('')}</select></label>
         <fieldset><legend>黑名单</legend>${Object.entries(callNumbers).map(([id, number]) => `<label class="check-label"><input type="checkbox" name="blacklist" value="${id}"${policy.blacklist.includes(id) ? ' checked' : ''}>加入黑名单 ${number}</label>`).join('')}</fieldset>
         <button type="button" class="btn btn-primary" data-action="save-call-policy">保存呼叫控制策略</button>
       </form>
-      <section class="panel call-simulator"><h4>模拟一次呼叫</h4><label>测试号码<select name="numberId" aria-label="测试号码">${Object.entries(callNumbers).map(([id, number]) => `<option value="${id}">${number}</option>`).join('')}</select></label><label>模拟时间<input name="simulatedAt" aria-label="模拟时间" type="datetime-local" value="2026-09-12T10:00"></label><button type="button" class="btn btn-secondary" data-action="simulate-call">模拟呼叫</button><p class="teaching-note">固定判定顺序：黑名单、时段、单号码频次、团队配额。</p></section></div>
+      <section class="panel call-simulator"><h4>模拟一次呼叫</h4><label>模拟员工<select name="employeeId" aria-label="模拟员工">${Object.entries(callEmployees).map(([id, employee]) => `<option value="${id}"${simulator.employeeId === id ? ' selected' : ''}>${employee.name} · ${employee.number}</option>`).join('')}</select></label><label>测试号码<select name="numberId" aria-label="测试号码">${Object.entries(callNumbers).map(([id, number]) => `<option value="${id}"${simulator.numberId === id ? ' selected' : ''}>${number}</option>`).join('')}</select></label><label>模拟时间<input name="simulatedAt" aria-label="模拟时间" type="datetime-local" value="${e(at)}"></label><button type="button" class="btn btn-secondary" data-action="simulate-call">模拟呼叫</button><p class="teaching-note">固定判定顺序：黑名单、时段、单号码频次、员工配额、团队配额。仅允许的模拟呼叫消耗额度，按模拟日期分别统计。</p><p>当日团队已用 ${daily.total || 0} / ${policy.teamQuota}</p>${Object.entries(callEmployees).map(([id, employee]) => `<p data-employee-usage="${id}">${employee.name}：已用 ${daily.employees?.[id] || 0} / ${policy.employeeQuotas[id]}</p>`).join('')}</section></div>
       <section class="panel call-log" data-call-teaching-log><h4>教学日志</h4>${logsMarkup(logs)}</section>
     </section>`;
   }
@@ -367,6 +385,61 @@
       ${state.answer ? `<section class="yunxi-assistant-answer" data-assistant-answer><h4>当前通话回答 · 模拟生成</h4><p>${e(state.answer)}</p></section>` : ''}</section>` : '<p class="empty-state">请先选择一条个人通话。录音与转写均为虚构教学样本。</p>'}</section></section>`;
   }
 
+  function salesKnowledge() {
+    const saved = yunxiData().salesKnowledge || {};
+    return {
+      materials: saved.materials || [{ id: 'MAT-4S-001', title: '4S 店课堂产品资料（虚构）',
+        text: '费用与优惠以门店核实为准；预约需确认时段与接待条件；售后以正式保修条款为准；置换需先评估车况与手续。' }],
+      qa: saved.qa || Object.fromEntries(Object.entries(salesScripts).map(([objection, script]) => [objection,
+        { ...script, id: script.source.split(' · ')[0], materialId: 'MAT-4S-001', question: objection, enabled: true }]))
+    };
+  }
+
+  function saveSalesMaterial(input = {}) {
+    if (yunxiData().sales?.status === 'active') return aiNotice('通话进行中，不能修改产品资料。');
+    const title = String(input.title || '').trim();
+    const text = String(input.text || '').trim();
+    if (!title || !text || title.length > 80 || text.length > 2000) return aiNotice('请填写虚构资料名称和文本（名称不超过 80 字，文本不超过 2000 字）。');
+    const knowledge = salesKnowledge();
+    const index = knowledge.materials.findIndex(material => material.title === title);
+    const localNumber = knowledge.materials.filter(material => material.id.startsWith('MAT-LOCAL-')).length + 1;
+    const material = { id: index < 0 ? 'MAT-LOCAL-' + String(localNumber).padStart(3, '0') : knowledge.materials[index].id, title, text };
+    if (index < 0) knowledge.materials.push(material);
+    else knowledge.materials[index] = material;
+    updateYunxi(next => { next.salesKnowledge = knowledge; });
+    refreshAi('ai-sales');
+    App.toast('已保存本地模拟资料；未读取文件、未上传。', 'success');
+    return { status: 'saved', ...material };
+  }
+
+  function saveSalesQa(input = {}) {
+    if (yunxiData().sales?.status === 'active') return aiNotice('通话进行中，不能修改 QA 配置。');
+    const knowledge = salesKnowledge();
+    const question = String(input.question || '').trim();
+    const text = String(input.text || '').trim();
+    const nextStep = String(input.next || '').trim();
+    if (!Object.hasOwn(salesScripts, input.objection) || !knowledge.materials.some(material => material.id === input.materialId) ||
+        !question || question.length > 120 || !text || text.length > 1000 || !nextStep || nextStep.length > 500) {
+      return aiNotice('请为有效 QA 选择已有本地资料，并填写问题、推荐回答和下一步建议。');
+    }
+    knowledge.qa[input.objection] = { ...knowledge.qa[input.objection], question, text,
+      next: nextStep, materialId: input.materialId, enabled: input.enabled !== false };
+    updateYunxi(next => { next.salesKnowledge = knowledge; });
+    refreshAi('ai-sales');
+    App.toast('已保存本地 QA 与高频问题配置，请人工核验内容。', 'success');
+    return { status: 'saved', ...knowledge.qa[input.objection] };
+  }
+
+  function salesKnowledgeEditor(active) {
+    const knowledge = salesKnowledge();
+    const qa = knowledge.qa[salesQaSelection];
+    const disabled = active ? ' disabled' : '';
+    return `<section class="panel yunxi-form yunxi-knowledge-editor"><h4>本地模拟产品资料与 QA 配置</h4><p>仅手工填写虚构资料名称与教学文本来模拟资料入库，不选择、不读取真实文件，也不进行网络上传。请勿输入真实身份、号码或业务资料。</p>
+      <form data-sales-material-form><label>模拟资料名称<input name="materialTitle" maxlength="80"${disabled}></label><label>模拟产品资料文本<textarea name="materialText" maxlength="2000"${disabled}></textarea></label><small>相同资料名称再次保存会更新本地文本，保留来源标识。</small><button type="button" class="btn" data-action="sales-save-material"${disabled}>保存本地模拟资料</button></form>
+      <details><summary>查看本地产品资料 · ${knowledge.materials.length} 份</summary>${knowledge.materials.map(material => `<article><strong>${e(material.id)} · ${e(material.title)}</strong><p>${e(material.text)}</p></article>`).join('')}</details>
+      <form data-sales-qa-form><label>QA 条目<select name="qaObjection" aria-label="QA 条目"${disabled}>${Object.keys(salesScripts).map(objection => `<option value="${e(objection)}"${objection === salesQaSelection ? ' selected' : ''}>${e(objection)}</option>`).join('')}</select></label><label>关联产品资料<select name="materialId"${disabled}>${knowledge.materials.map(material => `<option value="${e(material.id)}"${material.id === qa.materialId ? ' selected' : ''}>${e(material.title)}</option>`).join('')}</select></label><label>QA 问题<input name="qaQuestion" maxlength="120" value="${e(qa.question)}"${disabled}></label><label>推荐回答<textarea name="qaText" aria-label="推荐回答" maxlength="1000"${disabled}>${e(qa.text)}</textarea></label><label>下一步建议<textarea name="qaNext" aria-label="下一步建议" maxlength="500"${disabled}>${e(qa.next)}</textarea></label><label class="check-label"><input type="checkbox" name="qaEnabled"${qa.enabled ? ' checked' : ''}${disabled}>启用为高频问题</label><small>${e(qa.id)} · 内容由教师手工配置，推荐前需人工核验与所选资料的一致性；通话中锁定配置。</small><button type="button" class="btn" data-action="sales-save-qa"${disabled}>保存 QA 配置</button></form></section>`;
+  }
+
   function configureSales(input = {}) {
     const state = yunxiData().sales || {};
     if (state.status === 'active') return aiNotice('通话进行中，不能更换知识库或潜客。');
@@ -412,13 +485,19 @@
     if (state.knowledgeBase !== '4s-demo') return aiNotice('请先选择知识库，未配置时不推荐话术。');
     if (state.status !== 'active') return aiNotice('仅在模拟通话进行中推荐话术。');
     if (!Object.hasOwn(salesScripts, objection)) return aiNotice('请选择本场景提供的客户异议。');
-    const script = salesScripts[objection];
+    const knowledge = salesKnowledge();
+    const script = knowledge.qa[objection];
+    const material = knowledge.materials.find(item => item.id === script?.materialId);
+    if (!script?.enabled || !material) return aiNotice('该高频问题未启用或缺少本地资料依据，不推荐话术。');
     state.transcript.push(`客户异议：${objection}`);
     state.tags = [...new Set([...state.tags, objection])];
-    state.recommendations.push({ objection, source: script.source, text: script.text });
+    const recommendation = { objection, source: `${script.source} · ${material.id} · ${material.title}`,
+      qaId: script.id, question: script.question, materialId: material.id, materialTitle: material.title,
+      materialText: material.text, text: script.text, next: script.next };
+    state.recommendations.push(recommendation);
     updateYunxi(next => { next.sales = state; });
     refreshAi('ai-sales');
-    return { status: 'recommended', objection, ...script };
+    return { status: 'recommended', ...recommendation };
   }
 
   function endSalesCall() {
@@ -428,7 +507,7 @@
     state.status = 'complete';
     state.recap = { summary: state.tags.length ? `已完成模拟邀约，客户提出：${state.tags.join('、')}。` : '已结束模拟邀约，未记录客户异议。',
       intent: state.tags.includes('试驾时间') || state.tags.includes('置换') ? '有待核实的到店意向' : '意向待确认',
-      next: state.tags.length ? state.tags.map(tag => salesScripts[tag].next) : ['先核实客户需求与联系许可，再决定是否继续邀约。'] };
+      next: state.tags.length ? state.tags.map(tag => state.recommendations.findLast(item => item.objection === tag)?.next || salesScripts[tag].next) : ['先核实客户需求与联系许可，再决定是否继续邀约。'] };
     updateYunxi(next => { next.sales = state; });
     refreshAi('ai-sales');
     return state;
@@ -439,35 +518,30 @@
     const prospectId = Object.hasOwn(prospects, state.prospectId) ? state.prospectId : 'prospect-a';
     const prospect = prospects[prospectId];
     const active = state.status === 'active';
+    const knowledge = salesKnowledge();
     const recommendation = state.knowledgeBase === '4s-demo' && active ? state.recommendations?.at(-1) : null;
     return `<section class="yunxi-workbench" data-yunxi-stage="ai-sales"><div class="yunxi-workbench-heading"><h3>4S 店实时邀约台</h3><p>AI 助销 · 呼出营销中的实时话术推荐。全部由课堂点击推进，不拨打电话、不使用麦克风、不调用外部 AI。</p></div>
       <div class="yunxi-sales-layout"><section class="panel yunxi-form"><label>企业知识库<select name="knowledgeBase"${active ? ' disabled' : ''}><option value="">请先选择知识库</option><option value="4s-demo"${state.knowledgeBase === '4s-demo' ? ' selected' : ''}>云程 4S 店知识库（虚构）</option></select></label><label>选择潜客<select name="prospectId"${active ? ' disabled' : ''}>${Object.entries(prospects).map(([id, item]) => `<option value="${id}"${id === prospectId ? ' selected' : ''}>${e(item.name)}</option>`).join('')}</select></label><h4>${e(prospect.name)} · ${e(prospect.number)}</h4><p>${e(prospect.history)}</p><p>已有标签：${prospect.tags.map(e).join('、')}</p>
-      ${state.knowledgeBase === '4s-demo' ? '<details><summary>查看预置知识库 · 5 条 QA</summary><p>模拟产品资料：费用说明、售后范围、置换评估、试驾预约。全部为虚构课堂内容，不提供真实报价；资料上传与在线编辑未开放。</p>' + Object.values(salesScripts).map(script => `<p><strong>${e(script.source)}</strong><br>${e(script.text)}</p>`).join('') + '</details>' : '<p class="empty-state">知识库未配置，不推荐话术。请先选择知识库。</p>'}
+      ${state.knowledgeBase === '4s-demo' ? '<details><summary>查看本地知识库 · 5 条 QA</summary><p>预置 QA 可通过下方本地配置修改，所有内容仅供虚构课堂教学。</p>' + Object.values(knowledge.qa).map(script => `<p><strong>${e(script.source)}</strong> · ${script.enabled ? '高频问题已启用' : '未启用'}<br>${e(script.question)}<br>${e(script.text)}</p>`).join('') + '</details>' : '<p class="empty-state">知识库未配置，不推荐话术。请先选择知识库。</p>'}
       <button type="button" class="btn btn-primary" data-action="sales-start"${active ? ' disabled' : ''}>开始模拟呼出</button><p data-sales-status role="status">${active ? '通话进行中 · 模拟' : state.status === 'complete' ? '通话已结束 · 模拟' : '通话前 · 尚未呼出'}</p></section>
-      <section class="panel yunxi-ai-panel"><h4>实时转写 · 教师逐段推进</h4><div data-sales-transcript aria-live="polite">${state.transcript?.length ? transcriptMarkup(state.transcript) : '<p class="empty-state">尚无实时转写。</p>'}</div><button type="button" class="btn" data-action="sales-advance"${!active || state.segment >= 2 ? ' disabled' : ''}>推进下一段转写</button><h4>模拟客户异议</h4><div class="row-actions">${Object.keys(salesScripts).map(objection => `<button type="button" class="btn btn-secondary" data-sales-objection="${e(objection)}"${!active ? ' disabled' : ''}>${e(objection)}</button>`).join('')}</div>
-      ${recommendation ? `<section class="yunxi-live-recommendation" data-sales-recommendation aria-live="polite"><h4>实时话术 · 模拟推荐</h4><p>${e(recommendation.text)}</p><small>知识库依据：${e(recommendation.source)} · 建议待顾问核对，未自动发给客户。</small></section>` : '<p class="teaching-note">仅在通话中命中异议时显示推荐，不将建议冒充已说出的内容。</p>'}
+      <section class="panel yunxi-ai-panel"><h4>实时转写 · 教师逐段推进</h4><div data-sales-transcript aria-live="polite">${state.transcript?.length ? transcriptMarkup(state.transcript) : '<p class="empty-state">尚无实时转写。</p>'}</div><button type="button" class="btn" data-action="sales-advance"${!active || state.segment >= 2 ? ' disabled' : ''}>推进下一段转写</button><h4>模拟客户异议 · 已配置高频问题</h4><div class="row-actions">${Object.entries(knowledge.qa).filter(([, script]) => script.enabled).map(([objection, script]) => `<button type="button" class="btn btn-secondary" data-sales-objection="${e(objection)}"${!active ? ' disabled' : ''}>${e(script.question)}</button>`).join('')}</div>
+      ${recommendation ? `<section class="yunxi-live-recommendation" data-sales-recommendation aria-live="polite"><h4>实时话术 · 模拟推荐</h4><p>${e(recommendation.text)}</p><small>知识库依据：${e(recommendation.source)} · 建议待顾问核对，未自动发给客户。</small><details><summary>核对本次资料依据</summary><p>${e(recommendation.materialText)}</p></details></section>` : '<p class="teaching-note">仅在通话中命中异议时显示推荐，不将建议冒充已说出的内容。</p>'}
       <p data-sales-tags>实时触发标签：${state.tags?.length ? state.tags.map(e).join('、') : '暂无'}</p><button type="button" class="btn" data-action="sales-end"${!active ? ' disabled' : ''}>结束模拟通话</button></section></div>
-      ${state.recap ? `<section class="panel yunxi-ai-panel yunxi-sales-recap" data-sales-recap><h4>话后小结 · 模拟生成</h4><p>${e(state.recap.summary)}</p><p>客户意向：${e(state.recap.intent)} · 需人工核实，未认定成交。</p><h4>下一步建议</h4><ul>${state.recap.next.map(step => `<li>${e(step)}</li>`).join('')}</ul><h4>完整通话与话术触发回看</h4><p>模拟记录，无真实录音；上方保留完整转写，以下保留推荐触发顺序。</p><ol>${(state.recommendations || []).map(item => `<li>${e(item.objection)} → ${e(item.source)}<p>${e(item.text)}</p></li>`).join('') || '<li>本次未触发推荐。</li>'}</ol></section>` : ''}</section>`;
+      ${state.recap ? `<section class="panel yunxi-ai-panel yunxi-sales-recap" data-sales-recap><h4>话后小结 · 模拟生成</h4><p>${e(state.recap.summary)}</p><p>客户意向：${e(state.recap.intent)} · 需人工核实，未认定成交。</p><h4>下一步建议</h4><ul>${state.recap.next.map(step => `<li>${e(step)}</li>`).join('')}</ul><h4>完整通话与话术触发回看</h4><p>模拟记录，无真实录音；上方保留完整转写，以下保留推荐触发顺序。</p><ol>${(state.recommendations || []).map(item => `<li>${e(item.objection)} → ${e(item.source)}<p>${e(item.text)}</p></li>`).join('') || '<li>本次未触发推荐。</li>'}</ol></section>` : ''}${salesKnowledgeEditor(active)}</section>`;
   }
 
   function render(page = 'overview') {
     if (shell.dataset.currentMode !== 'yunxi') return;
     page = Object.hasOwn(pages, page) ? page : 'overview';
     shell.dataset.currentPage = page;
-    nav.querySelectorAll('[data-yunxi-page]').forEach(node => node.remove());
-    Object.entries(pages).forEach(([id, label]) => {
-      const button = document.createElement('button');
-      button.type = 'button'; button.className = 'nav-item' + (id === page ? ' active' : '');
-      button.dataset.yunxiPage = id; button.textContent = label;
-      if (id === page) button.setAttribute('aria-current', 'page');
-      nav.append(button);
-    });
+    App.renderNavigation('yunxi', page);
+    const restoreFocus = App.preserveFocus(main);
     const heading = page === 'overview' ? '云犀功能演示' : pages[page];
     let body;
     if (!loaded) body = '<p role="status">正在加载教学资料…</p>';
     else if (loadError) body = '<section class="panel module-placeholder" role="alert"><h3>资料加载失败</h3><p>请检查网络后刷新页面重试。当前不展示替代或虚构资料。</p></section>';
     else if (page === 'overview') body = '<div class="mode-grid yunxi-products">' + products.map(product =>
-      `<article class="mode-card yunxi-card" data-yunxi-product="${e(product.id)}"><span class="section-label">独立产品功能教学</span><h3>${e(product.name)}</h3><p>${e(product.positioning)}</p><details><summary>查看教学资料</summary>${materials(product)}</details><button type="button" class="btn btn-secondary" data-yunxi-page="${e(product.id)}">进入${e(product.name)}教学页</button></article>`
+      `<article class="mode-card yunxi-card" data-yunxi-product="${e(product.id)}"><span class="section-label">独立产品功能教学</span><h3>${e(product.name)}</h3><p>${e(product.positioning)}</p><dl class="yunxi-card-summary"><dt>客户问题</dt><dd data-customer-problem>${e(product.customerProblem)}</dd><dt>核心能力</dt><dd><ul data-core-capabilities>${product.coreCapabilities.map(capability => `<li>${e(capability)}</li>`).join('')}</ul></dd><dt>适用场景</dt><dd data-applicable-scenario>${e(product.applicableScenario)}</dd></dl><details><summary>查看教学资料</summary>${materials(product)}</details><button type="button" class="btn btn-secondary" data-yunxi-page="${e(product.id)}">进入${e(product.name)}教学页</button></article>`
     ).join('') + '</div>';
     else if (page === 'cloud-card') body = cloudCardModule();
     else if (page === 'call-control') body = callControlModule();
@@ -475,6 +549,7 @@
     else if (page === 'ai-assistant') body = assistantModule();
     else if (page === 'ai-sales') body = salesModule();
     main.innerHTML = `<section class="home-intro"><p class="eyebrow">独立教学区域 · 云犀</p><h2>${e(heading)}</h2><p>五项功能分别教学，使用虚构或脱敏样本；本区域不连接真实通话和外部业务系统。</p></section>${body}`;
+    restoreFocus(page === 'ai-sales' ? '[data-sales-status]' : 'h2');
   }
 
   function bind() {
@@ -489,11 +564,15 @@
         knowledgeBase: main.querySelector('[name="knowledgeBase"]').value,
         prospectId: main.querySelector('[name="prospectId"]').value
       });
+      if (event.target.matches('[name="qaObjection"]')) {
+        salesQaSelection = event.target.value;
+        refreshAi('ai-sales');
+      }
     });
     document.addEventListener('click', event => {
-      if (shell.dataset.currentMode !== 'yunxi') return;
       const button = event.target.closest('[data-yunxi-page]');
-      if (button) App.navigate('yunxi', button.dataset.yunxiPage);
+      if (button) { App.navigate('yunxi', button.dataset.yunxiPage); return; }
+      if (shell.dataset.currentMode !== 'yunxi') return;
       if (event.target.closest('[data-action="preview-card"]')) {
         previewCard();
       }
@@ -503,6 +582,7 @@
       if (event.target.closest('[data-action="simulate-call"]')) {
         const simulator = main.querySelector('.call-simulator');
         const result = simulateControlledCall({ numberId: simulator?.querySelector('[name="numberId"]')?.value,
+          employeeId: simulator?.querySelector('[name="employeeId"]')?.value,
           at: simulator?.querySelector('[name="simulatedAt"]')?.value });
         App.toast(result.reason, result.allowed ? 'success' : 'error');
       }
@@ -527,6 +607,16 @@
       const objection = event.target.closest('[data-sales-objection]');
       if (objection) triggerSalesObjection(objection.dataset.salesObjection);
       if (action === 'sales-end') endSalesCall();
+      if (action === 'sales-save-material') {
+        const form = main.querySelector('[data-sales-material-form]');
+        saveSalesMaterial({ title: form.elements.materialTitle.value, text: form.elements.materialText.value });
+      }
+      if (action === 'sales-save-qa') {
+        const form = main.querySelector('[data-sales-qa-form]');
+        saveSalesQa({ objection: form.elements.qaObjection.value, materialId: form.elements.materialId.value,
+          question: form.elements.qaQuestion.value, text: form.elements.qaText.value,
+          next: form.elements.qaNext.value, enabled: form.elements.qaEnabled.checked });
+      }
     });
   }
 
@@ -535,12 +625,20 @@
     updateYunxi(next => { next.cloudCard = card; });
     if (shell.dataset.currentMode === 'yunxi' && shell.dataset.currentPage === 'cloud-card') render('cloud-card');
     return { status: 'previewed', card, limitation: card.terminal === 'unsupported' ?
-      '当前终端情境不支持展示名片，实际效果以终端、网络和业务配置为准。' : null };
+      '当前终端情境不支持展示名片。' + cardQualifications : null };
   }
 
   function saveCallPolicy(input) {
     const policy = policyState(input || policyFormState());
-    updateYunxi(next => { next.callPolicy = policy; });
+    const simulator = !input && main.querySelector('.call-simulator');
+    updateYunxi(next => {
+      next.callPolicy = policy;
+      if (simulator) next.callSimulator = {
+        employeeId: simulator.querySelector('[name="employeeId"]').value,
+        numberId: simulator.querySelector('[name="numberId"]').value,
+        at: simulator.querySelector('[name="simulatedAt"]').value
+      };
+    });
     if (shell.dataset.currentMode === 'yunxi' && shell.dataset.currentPage === 'call-control') render('call-control');
     return { status: 'saved', policy };
   }
@@ -561,26 +659,34 @@
     const sourceId = typeof input.sourceId === 'string' && input.sourceId ? input.sourceId : null;
     const replay = sourceId && yunxiData().callLogs?.find(log => log.sourceId === sourceId);
     if (replay) return { allowed: replay.allowed, reason: replay.reason, rule: replay.rule };
-    const policy = policyState(yunxiData().callPolicy);
+    const state = yunxiData();
+    const policy = policyState(state.callPolicy);
     const numberId = Object.hasOwn(callNumbers, input.numberId) ? input.numberId : 'test-a';
+    const employeeId = Object.hasOwn(callEmployees, input.employeeId) ? input.employeeId : 'staff-a';
     const moment = simulatedMoment(input.at);
-    const daily = callCounters[moment.day] || { total: 0, numbers: Object.create(null) };
+    const counters = state.callCounters || {};
+    const daily = counters[moment.day] || { total: 0, numbers: {}, employees: {} };
+    daily.employees ||= {};
     let result;
     if (policy.blacklist.includes(numberId)) result = { allowed: false, reason: '黑名单拦截', rule: 'blacklist' };
     else if (!hourAllowed(moment.hour, policy.startHour, policy.endHour)) result = { allowed: false, reason: '不在允许呼叫时段', rule: 'allowed-hours' };
     else if ((daily.numbers[numberId] || 0) >= policy.perNumberLimit) result = { allowed: false, reason: '达到单号码日联系上限', rule: 'single-number-frequency' };
+    else if ((daily.employees[employeeId] || 0) >= policy.employeeQuotas[employeeId]) result = { allowed: false, reason: '达到员工日配额', rule: 'employee-quota' };
     else if (daily.total >= policy.teamQuota) result = { allowed: false, reason: '达到团队日配额', rule: 'team-quota' };
     else {
       daily.total += 1;
       daily.numbers[numberId] = (daily.numbers[numberId] || 0) + 1;
-      callCounters[moment.day] = daily;
+      daily.employees[employeeId] = (daily.employees[employeeId] || 0) + 1;
+      counters[moment.day] = daily;
       result = { allowed: true, reason: '允许呼叫', rule: 'allowed' };
     }
     updateYunxi(next => {
       const logs = Array.isArray(next.callLogs) ? next.callLogs : [];
-      logs.push({ number: callNumbers[numberId], ...result, at: moment.display,
+      logs.push({ number: callNumbers[numberId], employeeId, ...result, at: moment.display,
         ...(sourceId ? { sourceId } : {}) });
       next.callLogs = logs.slice(-30);
+      next.callCounters = counters;
+      next.callSimulator = { employeeId, numberId, at: moment.display };
     });
     if (shell.dataset.currentMode === 'yunxi' && shell.dataset.currentPage === 'call-control') render('call-control');
     return result;
@@ -589,6 +695,6 @@
   window.Yunxi = Object.freeze({ pages, ready, render, bind,
     previewCard, saveCallPolicy, simulateControlledCall,
     runAnalysis, selectPersonalCall, generateAssistantOutput, askAssistant,
-    configureSales, startSalesCall, advanceSalesTranscript, triggerSalesObjection, endSalesCall });
+    configureSales, saveSalesMaterial, saveSalesQa, startSalesCall, advanceSalesTranscript, triggerSalesObjection, endSalesCall });
   bind();
 }());
