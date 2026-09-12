@@ -214,9 +214,15 @@
 
   function analysisConfig(input = {}) {
     return { industry: Object.hasOwn(industryModels, input.industry) ? input.industry : 'automotive',
-      start: /^\d{4}-\d{2}-\d{2}$/.test(input.start) ? input.start : '2026-09-07',
-      end: /^\d{4}-\d{2}-\d{2}$/.test(input.end) ? input.end : '2026-09-12',
+      start: Object.hasOwn(input, 'start') ? input.start : '2026-09-07',
+      end: Object.hasOwn(input, 'end') ? input.end : '2026-09-12',
       tags: Array.isArray(input.tags) ? analysisTags.filter(tag => input.tags.includes(tag)) : [...analysisTags] };
+  }
+
+  function validAnalysisDate(value) {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || value.startsWith('0000')) return false;
+    const date = new Date(value + 'T00:00:00Z');
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
   }
 
   function analysisFormState() {
@@ -249,6 +255,7 @@
     const previous = raw.retryId ? oldJobs.find(job => job.id === raw.retryId && job.status === 'failed') : null;
     if (raw.retryId && !previous) return aiNotice('没有可重试的失败任务。');
     const config = analysisConfig(previous ? previous.config : raw);
+    if (!validAnalysisDate(config.start) || !validAnalysisDate(config.end)) return aiNotice('请输入有效的分析开始日期和结束日期（YYYY-MM-DD）。');
     if (!config.tags.length) return aiNotice('请至少选择一个分析标签。');
     if (config.start > config.end) return aiNotice('分析开始日期不能晚于结束日期。');
     const calls = sampleCalls(config);

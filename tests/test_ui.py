@@ -368,6 +368,44 @@ class YunxiAiTests(UiAcceptanceTests):
         self.page.get_by_role('button', name='启动批量分析').click()
         self.assertIn('至少选择一个分析标签', self.page.locator('#toast-root').inner_text())
 
+    def test_analysis_blank_form_dates_show_error_without_changing_job_history(self):
+        self.ai_page('ai-analytics')
+        self.page.get_by_role('button', name='启动批量分析').click()
+        before = self.page.evaluate('JSON.stringify(App.yunxiState.get().analyses)')
+        for field in ('分析开始日期', '分析结束日期'):
+            with self.subTest(field=field):
+                self.ai_page('ai-analytics')
+                self.page.get_by_label(field).fill('')
+                self.page.get_by_role('button', name='启动批量分析').click()
+                self.assertEqual(self.page.evaluate('JSON.stringify(App.yunxiState.get().analyses)'), before)
+                self.assertIn('有效的分析开始日期和结束日期', self.page.locator('#toast-root').inner_text())
+                self.assertEqual(self.page.get_by_label(field).input_value(), '')
+
+    def test_analysis_explicit_invalid_api_dates_are_rejected_before_persistence(self):
+        self.ai_page('ai-analytics')
+        before = self.page.evaluate('JSON.stringify(App.yunxiState.get().analyses)')
+        for field in ('start', 'end'):
+            for value in ('', ' ', None, 20260912, 'not-a-date', '2026-2-01',
+                          '2026-02-29', '2026-04-31', '2026-13-01', '0000-01-01'):
+                with self.subTest(field=field, value=value):
+                    result = self.page.evaluate('(input) => Yunxi.runAnalysis(input)', {field: value})
+                    self.assertEqual(result['status'], 'invalid')
+                    self.assertIn('有效的分析开始日期和结束日期', result['reason'])
+                    self.assertEqual(self.page.evaluate('JSON.stringify(App.yunxiState.get().analyses)'), before)
+
+    def test_analysis_omitted_api_dates_keep_defaults_and_valid_leap_day_is_accepted(self):
+        self.ai_page('ai-analytics')
+        result = self.page.evaluate('Yunxi.runAnalysis({})')
+        self.assertEqual(result['status'], 'complete')
+        self.assertEqual((result['config']['start'], result['config']['end']), ('2026-09-07', '2026-09-12'))
+        result = self.page.evaluate('Yunxi.runAnalysis({start: "2026-09-11"})')
+        self.assertEqual(result['status'], 'complete')
+        self.assertEqual((result['config']['start'], result['config']['end']), ('2026-09-11', '2026-09-12'))
+        result = self.page.evaluate('Yunxi.runAnalysis({start: "2024-02-29", end: "2024-02-29"})')
+        self.assertEqual(result['status'], 'empty')
+        self.assertEqual(result['config']['start'], '2024-02-29')
+        self.assertEqual(self.page.evaluate('App.yunxiState.get().analyses.length'), 3)
+
     def test_analytics_model_and_tags_change_results_and_old_failed_job_can_be_retried(self):
         self.ai_page('ai-analytics')
         self.page.get_by_label('演示分析失败').check()
