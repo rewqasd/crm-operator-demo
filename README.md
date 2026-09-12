@@ -10,6 +10,21 @@
 
 自动演示提供暂停、上一步、下一步、倍速、重播和退出控制。业务操作保存在浏览器本地存储中，可通过“重置数据”恢复初始状态。
 
+## 验收测试
+
+安装测试依赖与 Chromium 浏览器：
+
+```text
+python3 -m pip install playwright
+python3 -m playwright install chromium
+```
+
+运行可重复的验收测试：
+
+```text
+python3 -m unittest discover -s tests -v
+```
+
 ## 数据边界
 
 - 企业名称、成立日期、行业和登记地域来自页面中标注的公开来源，核验日期为 2026-07-19。
@@ -20,4 +35,3 @@
 ## GitHub Pages
 
 将本目录推送到公开仓库 `crm-operator-demo`，在仓库 Settings → Pages 中选择从 `main` 分支根目录发布即可。
-
