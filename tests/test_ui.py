@@ -209,7 +209,12 @@ class YunxiNavigationTests(UiAcceptanceTests):
             card.get_by_role('button', name=f'进入{name}教学页').click()
             self.assertEqual(self.page.locator('#app-shell').get_attribute('data-current-page'), product_id)
             self.assertTrue(self.page.get_by_role('heading', name=name, exact=True).is_visible())
-            self.assertTrue(self.page.get_by_text('交互模块准备中', exact=True).is_visible())
+            if product_id == 'cloud-card':
+                self.assertTrue(self.page.get_by_role('heading', name='云名片模拟器', exact=True).is_visible())
+            elif product_id == 'call-control':
+                self.assertTrue(self.page.get_by_role('heading', name='呼叫控制策略台', exact=True).is_visible())
+            else:
+                self.assertTrue(self.page.get_by_text('交互模块准备中', exact=True).is_visible())
             self.assertEqual(self.page.locator('#mode-navigation .active').inner_text(), name)
             self.page.locator('#mode-navigation [data-yunxi-page="overview"]').click()
         content = self.page.locator('#main-content').inner_text()
@@ -226,8 +231,7 @@ class YunxiNavigationTests(UiAcceptanceTests):
         self.enter_yunxi()
         result = self.page.evaluate('''() => {
             Yunxi.bind(); Yunxi.bind();
-            const methods = ['previewCard', 'saveCallPolicy', 'simulateControlledCall',
-                'runAnalysis', 'generateAssistantOutput', 'startSalesCall',
+            const methods = ['runAnalysis', 'generateAssistantOutput', 'startSalesCall',
                 'triggerSalesObjection', 'endSalesCall'];
             const outcomes = methods.map(method => Yunxi[method]());
             Object.keys(Yunxi.pages).forEach(page => App.navigate('yunxi', page));
@@ -258,6 +262,63 @@ class YunxiNavigationTests(UiAcceptanceTests):
             self.page.locator('#mode-navigation [data-yunxi-page="ai-assistant"]').click()
             self.assertTrue(self.page.evaluate('document.documentElement.scrollWidth <= innerWidth'))
             self.page.locator('#mode-navigation [data-yunxi-page="overview"]').click()
+
+
+class YunxiCardAndControlTests(YunxiNavigationTests):
+    def test_cloud_card_preview_uses_teaching_fields_and_states_terminal_limits(self):
+        self.enter_yunxi()
+        self.page.locator('#mode-navigation [data-yunxi-page="cloud-card"]').click()
+        self.page.get_by_label('名片类型').select_option('dynamic')
+        self.page.get_by_label('模拟企业简称').fill('云启企服')
+        self.page.get_by_label('品牌语').fill('让服务更近一步')
+        self.page.get_by_label('服务标签').fill('企业宽带, 上云服务')
+        self.page.get_by_label('外呼场景').select_option('renewal')
+        self.page.get_by_label('终端情境').select_option('unsupported')
+        self.page.get_by_role('button', name='更新手机预览').click()
+        preview = self.page.locator('[data-cloud-card-preview]')
+        for text in ('动态名片（教学模拟）', '云启企服', '让服务更近一步',
+                     '企业宽带', '上云服务', '续约关怀', '教学模拟，不代表实际终端展示结果'):
+            self.assertIn(text, preview.inner_text())
+        limitations = self.page.locator('[data-card-limitations]')
+        self.assertTrue(limitations.is_visible())
+        self.assertIn('不支持展示', limitations.inner_text())
+        self.assertNotIn('100%', self.page.locator('#main-content').inner_text())
+        self.assertNotIn('防标记', self.page.locator('#main-content').inner_text())
+        self.assertEqual(self.page.evaluate('''() => {
+            const card = App.yunxiState.get().cloudCard;
+            return { type: card.type, shortName: card.shortName, terminal: card.terminal };
+        }'''), {'type': 'dynamic', 'shortName': '云启企服', 'terminal': 'unsupported'})
+
+    def test_controlled_calls_apply_deterministic_rules_and_keep_crm_bytes(self):
+        self.enter_yunxi()
+        self.page.locator('#mode-navigation [data-yunxi-page="call-control"]').click()
+        self.page.get_by_label('单号码日上限').fill('1')
+        self.page.get_by_label('团队日配额').fill('3')
+        self.page.get_by_label('允许开始时段').select_option('9')
+        self.page.get_by_label('允许结束时段').select_option('18')
+        self.page.get_by_label('加入黑名单 1**-****-3098').check()
+        self.page.get_by_role('button', name='保存呼叫控制策略').click()
+        before = self.page.evaluate('localStorage.getItem("crm_operator_state_v4")')
+        results = self.page.evaluate('''() => {
+            const at = '2026-09-12T10:00:00';
+            return [
+                Yunxi.simulateControlledCall({ numberId: 'test-a', at }),
+                Yunxi.simulateControlledCall({ numberId: 'test-a', at }),
+                Yunxi.simulateControlledCall({ numberId: 'test-b', at })
+            ];
+        }''')
+        self.assertEqual(results, [
+            {'allowed': True, 'reason': '允许呼叫', 'rule': 'allowed'},
+            {'allowed': False, 'reason': '达到单号码日联系上限', 'rule': 'single-number-frequency'},
+            {'allowed': False, 'reason': '黑名单拦截', 'rule': 'blacklist'},
+        ])
+        self.assertEqual(self.page.evaluate('localStorage.getItem("crm_operator_state_v4")'), before)
+        log = self.page.locator('[data-call-teaching-log]')
+        self.assertIn('允许呼叫', log.inner_text())
+        self.assertIn('达到单号码日联系上限', log.inner_text())
+        self.assertIn('黑名单拦截', log.inner_text())
+        self.assertIsNone(__import__('re').search(r'(?<!\d)1\d{10}(?!\d)',
+                                                   self.page.locator('#main-content').inner_text()))
 
 
 class CrmFlowTests(UiAcceptanceTests):

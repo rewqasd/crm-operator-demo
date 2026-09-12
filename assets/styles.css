@@ -122,6 +122,36 @@ button:focus-visible, a:focus-visible { outline: 3px solid #63b1ff; outline-offs
 .yunxi-materials ul { padding-left: 20px; margin: 0; }
 .yunxi-materials li + li { margin-top: 8px; }
 .yunxi-materials small { display: block; font-size: 11px; }
+.yunxi-workbench { display: grid; gap: 20px; }
+.yunxi-workbench-heading h3 { margin: 0 0 8px; font-size: 22px; }
+.yunxi-workbench-heading p { margin: 0; color: var(--muted); line-height: 1.8; }
+.cloud-card-layout, .call-control-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, .9fr); gap: 20px; align-items: stretch; }
+.yunxi-form, .call-simulator, .call-log { padding: 22px; }
+.yunxi-form { display: grid; gap: 15px; }
+.yunxi-form label, .call-simulator label { display: grid; gap: 7px; color: var(--muted); font-size: 12px; }
+.yunxi-form input, .yunxi-form select, .call-simulator input, .call-simulator select { width: 100%; border: 1px solid #bdcbd9; border-radius: 6px; padding: 10px; color: var(--text); background: white; }
+.yunxi-form small { color: var(--muted); line-height: 1.6; }
+.yunxi-form fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 0; padding: 11px; }
+.yunxi-form legend { padding: 0 5px; color: var(--muted); font-size: 12px; }
+.check-label { display: flex !important; align-items: center; gap: 8px; margin-top: 7px; }
+.check-label input { width: auto; }
+.cloud-phone { position: relative; overflow: hidden; min-height: 400px; padding: 64px 28px 28px; border: 9px solid #172d44; border-radius: 32px; background: linear-gradient(165deg, #e5f5f7, #fff); box-shadow: 0 10px 24px #10263e1c; }
+.cloud-phone-speaker { position: absolute; top: 19px; left: calc(50% - 40px); width: 80px; height: 7px; border-radius: 8px; background: #172d44; }
+.cloud-phone-status { margin: 0 0 36px; color: var(--muted); font-size: 12px; }
+.cloud-phone strong { color: var(--cyan); font-size: 14px; }
+.cloud-phone h4 { margin: 16px 0 10px; font-size: 30px; overflow-wrap: anywhere; }
+.cloud-phone > p { line-height: 1.8; }
+.cloud-tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0; }
+.cloud-tags span { padding: 6px 9px; border-radius: 999px; color: #075c62; background: #d9f1f2; font-size: 12px; }
+.cloud-disclaimer { margin-top: 40px; color: var(--muted); font-size: 12px; }
+.cloud-limit { margin: 14px 0 0; padding: 11px; border-left: 3px solid #ca9d3d; background: #fff8e7; font-size: 12px; }
+.call-simulator { display: grid; align-content: start; gap: 15px; }
+.call-simulator h4, .call-log h4 { margin: 0; font-size: 17px; }
+.call-simulator .btn { margin-top: 5px; }
+.call-log { overflow-wrap: anywhere; }
+.call-log-list { display: grid; gap: 10px; margin: 16px 0 0; padding: 0; list-style: none; }
+.call-log-list li { display: grid; grid-template-columns: minmax(104px, .7fr) minmax(0, 1fr); gap: 5px 12px; padding: 12px; border-radius: 7px; background: #f6f9fc; }
+.call-log-list small { grid-column: 1 / -1; color: var(--muted); }
 @media (max-width: 1050px) {
   #sidebar { width: 185px; }
   .topbar { padding: 20px 24px; }
@@ -130,6 +160,8 @@ button:focus-visible, a:focus-visible { outline: 3px solid #63b1ff; outline-offs
   .mode-card { padding: 22px; }
   .crm-two-columns { grid-template-columns: 1fr; gap: 0; }
   .deal-chain { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .cloud-card-layout, .call-control-layout { grid-template-columns: 1fr; }
+  .cloud-phone { min-height: 320px; }
 }
 @media (max-width: 720px) {
   #app-shell { display: block; }
