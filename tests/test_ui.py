@@ -8,10 +8,15 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 
 
+class QuietStaticRequestHandler(SimpleHTTPRequestHandler):
+    def log_message(self, format, *args):
+        pass
+
+
 class UiAcceptanceTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        handler = partial(SimpleHTTPRequestHandler, directory=ROOT)
+        handler = partial(QuietStaticRequestHandler, directory=ROOT)
         cls.server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
         cls.server_thread = Thread(target=cls.server.serve_forever, daemon=True)
         cls.server_thread.start()
