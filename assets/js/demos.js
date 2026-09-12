@@ -16,6 +16,13 @@
   const crmData = () => App.crmState.get();
   const has = (collection, id) => crmData()[collection]?.some(record => record.id === id);
 
+  function requireDemoOwner() {
+    const lead = crmData().leads?.find(item => item.id === leadId);
+    if (lead?.owner !== CRM.currentOwner) {
+      throw new Error(`${leadId} 归属已变化，当前为${lead?.owner || '未分配'}；演示仅能操作${CRM.currentOwner}的线索，本步骤未写入数据`);
+    }
+  }
+
   function clearHighlight() {
     highlighted?.classList.remove('demo-target');
     highlighted = null;
@@ -25,7 +32,11 @@
     return { id, title, target, explanation: { action: title, why, change },
       enter(mutate) {
         App.navigate(mode, page);
-        if (mutate) action();
+        if (mutate) {
+          // Paused tours may interleave with manual edits or another tab's storage writes.
+          if (mode === 'crm' && !['pool', 'filter', 'claim', 'dashboard'].includes(id)) requireDemoOwner();
+          action();
+        }
         // Business APIs update state; render once more to show their result.
         App.navigate(mode, page);
         view();

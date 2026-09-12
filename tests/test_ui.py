@@ -720,6 +720,60 @@ class DemoPlayerTests(UiAcceptanceTests):
         self.page.evaluate("Demos.runAllForTest('crm')")
         self.assertEqual(self.page.evaluate("localStorage.getItem('crm_operator_state_v4')"), before)
 
+    def test_yunxi_replay_selects_cached_demo_analysis_after_manual_analysis(self):
+        self.require_demos()
+        result = self.page.evaluate('''async () => {
+            await Demos.runAllForTest('yunxi'); Demos.exit({ restore: false });
+            App.navigate('yunxi', 'ai-analytics');
+            const manual = Yunxi.runAnalysis({ industry: 'education' });
+            const before = JSON.stringify(App.yunxiState.get().analyses);
+            const crm = localStorage.getItem('crm_operator_state_v4');
+            await Demos.start('yunxi'); Demos.pause(); Demos.next(); Demos.next();
+            return { manualStatus: manual.status,
+                unchanged: before === JSON.stringify(App.yunxiState.get().analyses),
+                crmSame: crm === localStorage.getItem('crm_operator_state_v4') };
+        }''')
+        self.assertEqual(result, {'manualStatus': 'empty', 'unchanged': True, 'crmSame': True})
+        self.assertEqual(self.page.locator('[data-analysis-form] [name="industry"]').input_value(), 'automotive')
+        self.assertEqual(self.page.locator('[data-analysis-metric="total"]').inner_text(), '6')
+        self.assertIn('AI 数析', self.page.locator('#demo-controls').inner_text())
+        self.page.evaluate('Demos.exit({ restore: false })')
+        self.page.reload()
+        self.page.evaluate("Yunxi.ready.then(() => App.navigate('yunxi', 'ai-analytics'))")
+        self.assertEqual(self.page.locator('[data-analysis-metric="total"]').inner_text(), '6')
+        self.page.evaluate("Yunxi.runAnalysis({ industry: 'education' })")
+        self.assertEqual(self.page.locator('[data-analysis-form] [name="industry"]').input_value(), 'education')
+
+    def test_reassigned_lead_blocks_every_later_demo_mutation(self):
+        self.require_demos()
+        for target in ('contact', 'follow-up', 'customer', 'opportunity', 'quote', 'contract',
+                       'order', 'payment', 'win'):
+            with self.subTest(target=target):
+                result = self.page.evaluate('''async target => {
+                    await Demos.start('crm'); Demos.pause();
+                    const order = ['pool', 'filter', 'claim', 'contact', 'follow-up', 'customer',
+                        'opportunity', 'quote', 'contract', 'order', 'payment', 'win'];
+                    for (let i = 1; i < order.indexOf(target); i++) Demos.next();
+                    const lead = App.crmState.get().leads.find(item => item.id === 'TJHD-001');
+                    if (!lead.customerId) CRM.assignLead(lead.id, '李经理（模拟）');
+                    else App.crmState.upsert('leads', { ...lead, owner: '李经理（模拟）' });
+                    const before = localStorage.getItem('crm_operator_state_v4');
+                    const other = localStorage.getItem('yunxi_teaching_state_v1');
+                    let error = '';
+                    try { Demos.next(); } catch (caught) { error = caught.message; }
+                    return { blocked: Boolean(error), error,
+                        untouched: before === localStorage.getItem('crm_operator_state_v4'),
+                        isolated: other === localStorage.getItem('yunxi_teaching_state_v1') };
+                }''', target)
+                self.assertTrue(result['blocked'], target)
+                self.assertTrue(result['untouched'], target)
+                self.assertTrue(result['isolated'], target)
+                self.assertIn('归属', result['error'])
+                self.assertIn('李经理', self.page.locator('#demo-controls [role="alert"]').inner_text())
+                self.assertTrue(self.page.locator('#demo-controls').get_by_role('button', name='播放', exact=True).is_visible())
+                self.assertEqual(self.page.locator('#demo-controls').get_attribute('data-step'), target)
+                self.page.evaluate('Demos.exit({ restore: true })')
+
     def test_start_waits_for_crm_seed_and_exit_cancels_pending_start(self):
         self.page.add_init_script('''(() => {
             const original = window.fetch.bind(window);

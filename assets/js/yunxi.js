@@ -255,7 +255,12 @@
     // A guided replay reuses only its explicit source; manual analyses remain independent.
     const sourceId = typeof raw.sourceId === 'string' && raw.sourceId ? raw.sourceId : null;
     const replay = sourceId && oldJobs.find(job => job.sourceId === sourceId);
-    if (replay) { refreshAi('ai-analytics'); return replay; }
+    if (replay) {
+      updateYunxi(next => { next.selectedAnalysisId = replay.id; });
+      analysisDrill = { tag: '', callId: '' };
+      refreshAi('ai-analytics');
+      return replay;
+    }
     const previous = raw.retryId ? oldJobs.find(job => job.id === raw.retryId && job.status === 'failed') : null;
     if (raw.retryId && !previous) return aiNotice('没有可重试的失败任务。');
     const config = analysisConfig(previous ? previous.config : raw);
@@ -267,8 +272,11 @@
       config, status: raw.fail ? 'failed' : calls.length ? 'complete' : 'empty',
       attempts: (previous?.attempts || 0) + 1, callIds: calls.map(call => call.id) };
     if (sourceId) job.sourceId = sourceId;
-    // Most recently attempted task is displayed last, while retries retain the original identity.
-    updateYunxi(next => { next.analyses = [...oldJobs.filter(item => item.id !== job.id), job]; });
+    // Select the attempted task explicitly; retries retain the original identity.
+    updateYunxi(next => {
+      next.analyses = [...oldJobs.filter(item => item.id !== job.id), job];
+      next.selectedAnalysisId = job.id;
+    });
     analysisDrill = { tag: '', callId: '' };
     refreshAi('ai-analytics');
     return job;
@@ -297,8 +305,9 @@
   }
 
   function analyticsModule() {
-    const jobs = Array.isArray(yunxiData().analyses) ? yunxiData().analyses : [];
-    const job = jobs.at(-1);
+    const state = yunxiData();
+    const jobs = Array.isArray(state.analyses) ? state.analyses : [];
+    const job = jobs.find(item => item.id === state.selectedAnalysisId) || jobs.at(-1);
     const config = analysisConfig(job?.config);
     return `<section class="yunxi-workbench" data-yunxi-stage="ai-analytics"><div class="yunxi-workbench-heading"><h3>团队通话经营看板</h3><p>AI 数析 · 一段时间、多员工、多通电话的企业管理视角；不是实时话术助手。</p></div>
       <form class="panel yunxi-form yunxi-analysis-form" data-analysis-form><label>行业模型<select name="industry">${Object.entries(industryModels).map(([id, name]) => `<option value="${id}"${config.industry === id ? ' selected' : ''}>${e(name)}行业模型</option>`).join('')}</select></label><label>分析开始日期<input type="date" name="start" value="${e(config.start)}"></label><label>分析结束日期<input type="date" name="end" value="${e(config.end)}"></label>
