@@ -21,6 +21,10 @@
 
   function navigate(mode = 'home', page = '') {
     if (!['home', 'crm', 'yunxi'].includes(mode)) mode = 'home';
+    if (window.Demos?.activeMode && Demos.activeMode !== mode) {
+      Demos.requestExit();
+      return;
+    }
     closeModal();
     shell.dataset.currentMode = mode;
     shell.dataset.currentPage = page;

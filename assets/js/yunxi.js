@@ -252,6 +252,10 @@
   function runAnalysis(input) {
     const raw = input || analysisFormState();
     const oldJobs = Array.isArray(yunxiData().analyses) ? yunxiData().analyses : [];
+    // A guided replay reuses only its explicit source; manual analyses remain independent.
+    const sourceId = typeof raw.sourceId === 'string' && raw.sourceId ? raw.sourceId : null;
+    const replay = sourceId && oldJobs.find(job => job.sourceId === sourceId);
+    if (replay) { refreshAi('ai-analytics'); return replay; }
     const previous = raw.retryId ? oldJobs.find(job => job.id === raw.retryId && job.status === 'failed') : null;
     if (raw.retryId && !previous) return aiNotice('没有可重试的失败任务。');
     const config = analysisConfig(previous ? previous.config : raw);
@@ -262,6 +266,7 @@
     const job = { id: previous?.id || `analysis-${oldJobs.reduce((max, item) => Math.max(max, Number(item.id?.split('-')[1]) || 0), 0) + 1}`,
       config, status: raw.fail ? 'failed' : calls.length ? 'complete' : 'empty',
       attempts: (previous?.attempts || 0) + 1, callIds: calls.map(call => call.id) };
+    if (sourceId) job.sourceId = sourceId;
     // Most recently attempted task is displayed last, while retries retain the original identity.
     updateYunxi(next => { next.analyses = [...oldJobs.filter(item => item.id !== job.id), job]; });
     analysisDrill = { tag: '', callId: '' };
@@ -544,6 +549,9 @@
   }
 
   function simulateControlledCall(input = {}) {
+    const sourceId = typeof input.sourceId === 'string' && input.sourceId ? input.sourceId : null;
+    const replay = sourceId && yunxiData().callLogs?.find(log => log.sourceId === sourceId);
+    if (replay) return { allowed: replay.allowed, reason: replay.reason, rule: replay.rule };
     const policy = policyState(yunxiData().callPolicy);
     const numberId = Object.hasOwn(callNumbers, input.numberId) ? input.numberId : 'test-a';
     const moment = simulatedMoment(input.at);
@@ -561,7 +569,8 @@
     }
     updateYunxi(next => {
       const logs = Array.isArray(next.callLogs) ? next.callLogs : [];
-      logs.push({ number: callNumbers[numberId], ...result, at: moment.display });
+      logs.push({ number: callNumbers[numberId], ...result, at: moment.display,
+        ...(sourceId ? { sourceId } : {}) });
       next.callLogs = logs.slice(-30);
     });
     if (shell.dataset.currentMode === 'yunxi' && shell.dataset.currentPage === 'call-control') render('call-control');

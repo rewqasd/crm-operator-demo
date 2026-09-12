@@ -74,7 +74,7 @@ class UiAcceptanceTests(unittest.TestCase):
             '(nodes) => nodes.map(node => node.getAttribute("src"))'
         )
         self.assertEqual(scripts, ['assets/js/state.js', 'assets/js/app.js', 'assets/js/crm.js',
-                                   'assets/js/yunxi.js'])
+                                   'assets/js/yunxi.js', 'assets/js/demos.js'])
         for asset in ['assets/styles.css', *scripts]:
             self.assertEqual(self.page.request.get(self.url.replace('index.html', asset)).status, 200)
 
@@ -564,6 +564,210 @@ class YunxiAiTests(UiAcceptanceTests):
             for page in ('ai-analytics', 'ai-assistant', 'ai-sales'):
                 self.ai_page(page)
                 self.assertTrue(self.page.evaluate('document.documentElement.scrollWidth <= innerWidth'), (width, page))
+
+
+class DemoPlayerTests(UiAcceptanceTests):
+    def require_demos(self):
+        self.assertTrue(self.page.evaluate("typeof window.Demos?.start === 'function'"),
+                        'Guided demo controller is missing')
+
+    def test_selector_has_exactly_two_modes_and_complete_controls(self):
+        self.require_demos()
+        self.page.get_by_role('button', name='自动演示', exact=True).click()
+        self.assertEqual(self.page.locator('[data-demo-mode]').all_text_contents(),
+                         ['CRM 线索成交演示', '云犀五项功能导览'])
+        self.page.get_by_role('button', name='CRM 线索成交演示', exact=True).click()
+        controls = self.page.locator('#demo-controls')
+        controls.wait_for(state='visible')
+        for name in ('暂停', '上一步', '下一步', '重播', '退出'):
+            self.assertTrue(controls.get_by_role('button', name=name, exact=True).is_visible())
+        self.assertEqual(controls.locator('option').all_text_contents(), ['0.75 倍速', '1 倍速', '1.5 倍速'])
+        for label in ('正在做什么', '为什么做', '数据变化'):
+            self.assertIn(label, controls.inner_text())
+        controls.get_by_role('button', name='暂停', exact=True).click()
+        self.assertTrue(controls.get_by_role('button', name='播放', exact=True).is_visible())
+        self.assertEqual(self.page.locator('.demo-target').count(), 1)
+
+    def test_crm_fast_flow_and_replay_are_linked_and_idempotent(self):
+        self.require_demos()
+        result = self.page.evaluate('''async () => {
+            await CRM.ready;
+            const other = localStorage.getItem('yunxi_teaching_state_v1');
+            const first = await Demos.runAllForTest('crm');
+            const before = JSON.stringify(App.crmState.get());
+            await Demos.runAllForTest('crm');
+            const state = App.crmState.get();
+            return { steps: first.steps, elapsed: first.durationMs, state,
+                same: before === JSON.stringify(state),
+                other: other === localStorage.getItem('yunxi_teaching_state_v1'),
+                page: document.getElementById('app-shell').dataset.currentPage };
+        }''')
+        self.assertEqual(result['steps'], ['pool', 'filter', 'claim', 'contact', 'follow-up',
+                         'customer', 'opportunity', 'quote', 'contract', 'order', 'payment', 'win', 'dashboard'])
+        self.assertEqual(result['elapsed'], 240000)
+        self.assertEqual(result['page'], 'dashboard')
+        self.assertTrue(result['same'])
+        self.assertTrue(result['other'])
+        state = result['state']
+        for collection in ('customers', 'opportunities', 'tasks', 'quotes', 'contracts', 'orders', 'payments'):
+            self.assertEqual(len(state[collection]), 1, collection)
+            self.assertEqual(state[collection][0]['leadId'], 'TJHD-001')
+        self.assertEqual(state['opportunities'][0]['status'], '赢单')
+        self.assertEqual(state['payments'][0]['amount'], 12000)
+        self.assertEqual(state['tasks'][0]['customerId'], state['customers'][0]['id'])
+        self.assertEqual(len([a for a in state['activities'] if a['type'] == 'contact']), 1)
+        self.assertEqual(state['tasks'][0]['dueDate'], self.page.evaluate('''() => {
+            const d = new Date(); d.setDate(d.getDate() + 2); return d.toLocaleDateString('sv-SE');
+        }'''))
+
+    def test_yunxi_five_core_interactions_preserve_crm_bytes_and_replay(self):
+        self.require_demos()
+        result = self.page.evaluate('''async () => {
+            await CRM.ready;
+            const crm = localStorage.getItem('crm_operator_state_v4');
+            const first = await Demos.runAllForTest('yunxi');
+            const once = localStorage.getItem('yunxi_teaching_state_v1');
+            Demos.exit({ restore: false });
+            await Demos.runAllForTest('yunxi');
+            const state = App.yunxiState.get();
+            Demos.exit({ restore: false });
+            return { steps: first.steps, same: once === localStorage.getItem('yunxi_teaching_state_v1'),
+                crmSame: crm === localStorage.getItem('crm_operator_state_v4'), state };
+        }''')
+        self.assertEqual(result['steps'], ['cloud-card', 'call-control', 'ai-analytics', 'ai-assistant', 'ai-sales'])
+        self.assertTrue(result['crmSame'])
+        self.assertTrue(result['same'])
+        self.assertEqual(result['state']['cloudCard']['type'], 'dynamic')
+        self.assertEqual(result['state']['callLogs'][0]['rule'], 'blacklist')
+        self.assertEqual(result['state']['analyses'][0]['status'], 'complete')
+        self.assertEqual(result['state']['assistant']['status'], 'complete')
+        self.assertTrue(result['state']['assistant']['answer'])
+        self.assertEqual(result['state']['sales']['status'], 'complete')
+        self.assertEqual(len(result['state']['sales']['recommendations']), 1)
+
+    def test_restore_only_active_mode_and_keep_exit(self):
+        self.require_demos()
+        for mode, other in [('crm', 'yunxi'), ('yunxi', 'crm')]:
+            result = self.page.evaluate('''async ([mode, other]) => {
+                await CRM.ready;
+                const snapshot = JSON.stringify(App.domains[mode].get());
+                await Demos.runAllForTest(mode);
+                const changed = JSON.stringify(App.domains[mode].get()) !== snapshot;
+                const untouched = App.domains[other].get(); untouched.marker = 'must survive';
+                App.domains[other].save(untouched);
+                Demos.restart(); Demos.pause();
+                Demos.exit({ restore: true });
+                return { changed, restored: JSON.stringify(App.domains[mode].get()) === snapshot,
+                    isolated: App.domains[other].get().marker === 'must survive' };
+            }''', [mode, other])
+            self.assertEqual(result, {'changed': True, 'restored': True, 'isolated': True})
+        self.page.evaluate("Demos.runAllForTest('crm')")
+        self.page.locator('#demo-controls').get_by_role('button', name='退出', exact=True).click()
+        self.assertTrue(self.page.get_by_role('button', name='保留结果', exact=True).is_visible())
+        self.assertTrue(self.page.get_by_role('button', name='恢复演示前状态', exact=True).is_visible())
+        self.page.get_by_role('button', name='保留结果', exact=True).click()
+        self.assertFalse(self.page.locator('#demo-controls').is_visible())
+        self.assertEqual(self.page.evaluate('App.crmState.get().opportunities[0].status'), '赢单')
+
+    def test_pause_speed_previous_restart_missing_target_and_mode_lock(self):
+        self.require_demos()
+        self.page.clock.install()
+        self.page.evaluate("Demos.start('crm')")
+        self.page.evaluate('Demos.pause()')
+        self.page.clock.fast_forward(60000)
+        self.assertEqual(self.page.locator('#demo-controls').get_attribute('data-step'), 'pool')
+        self.page.evaluate('Demos.next()')
+        self.assertEqual(self.page.locator('#crm-filters [name="score"]').input_value(), '85')
+        self.page.evaluate('Demos.previous()')
+        self.assertEqual(self.page.locator('#demo-controls').get_attribute('data-step'), 'pool')
+        self.page.evaluate('Demos.setSpeed(1.5); Demos.resume()')
+        self.page.clock.fast_forward(12500)
+        self.assertEqual(self.page.locator('#demo-controls').get_attribute('data-step'), 'filter')
+        self.page.evaluate('Demos.pause(); Demos.restart(); Demos.pause()')
+        self.assertEqual(self.page.locator('#demo-controls').get_attribute('data-step'), 'pool')
+        self.page.evaluate("App.navigate('yunxi')")
+        self.assertEqual(self.page.locator('#app-shell').get_attribute('data-current-mode'), 'crm')
+        self.page.evaluate('''() => {
+            App.closeModal();
+            const query = document.querySelector.bind(document);
+            document.querySelector = selector => selector === '.crm-kpis' ? null : query(selector);
+            Demos.restart(); Demos.pause();
+        }''')
+        self.assertEqual(self.page.locator('#demo-controls').get_attribute('data-step'), 'pool')
+        self.assertEqual(self.page.locator('.demo-target').count(), 0)
+
+    def test_source_ids_deduplicate_only_demo_records(self):
+        self.page.evaluate('Yunxi.ready')
+        result = self.page.evaluate('''() => {
+            Yunxi.runAnalysis(); Yunxi.runAnalysis();
+            const config = { sourceId: 'demo-test-analysis' };
+            Yunxi.runAnalysis(config); Yunxi.runAnalysis(config);
+            Yunxi.saveCallPolicy({ blacklist: ['test-a'] });
+            Yunxi.simulateControlledCall(); Yunxi.simulateControlledCall();
+            Yunxi.simulateControlledCall({ sourceId: 'demo-test-call' });
+            Yunxi.simulateControlledCall({ sourceId: 'demo-test-call' });
+            const data = App.yunxiState.get();
+            return { analyses: data.analyses.length, logs: data.callLogs.length,
+                sources: data.analyses.filter(a => a.sourceId === 'demo-test-analysis').length };
+        }''')
+        self.assertEqual(result, {'analyses': 3, 'logs': 3, 'sources': 1})
+
+    def test_crm_replay_after_reload_keeps_existing_records_unchanged(self):
+        self.require_demos()
+        self.page.evaluate("Demos.runAllForTest('crm')")
+        before = self.page.evaluate("localStorage.getItem('crm_operator_state_v4')")
+        self.page.reload()
+        self.page.evaluate("Demos.runAllForTest('crm')")
+        self.assertEqual(self.page.evaluate("localStorage.getItem('crm_operator_state_v4')"), before)
+
+    def test_start_waits_for_crm_seed_and_exit_cancels_pending_start(self):
+        self.page.add_init_script('''(() => {
+            const original = window.fetch.bind(window);
+            const gate = new Promise(resolve => { window.releaseCrmSeed = resolve; });
+            window.fetch = async (...args) => {
+                if (String(args[0]).includes('crm-leads.json')) await gate;
+                return original(...args);
+            };
+        })();''')
+        self.page.reload()
+        self.page.evaluate("() => { window.pendingDemo = Demos.start('crm'); }")
+        self.assertFalse(self.page.locator('#demo-controls').is_visible())
+        self.page.evaluate('Demos.exit({ restore: false }); releaseCrmSeed()')
+        self.page.evaluate('window.pendingDemo')
+        self.assertFalse(self.page.locator('#demo-controls').is_visible())
+        self.assertEqual(self.page.evaluate('App.crmState.get().leads.length'), 50)
+        self.page.evaluate("Demos.start('crm'); Demos.pause()")
+
+    def test_invalid_mode_and_speed_do_not_mutate_domains(self):
+        self.require_demos()
+        result = self.page.evaluate('''async () => {
+            await CRM.ready;
+            const before = JSON.stringify(localStorage);
+            let rejected = 0;
+            try { await Demos.start('combined'); } catch (_) { rejected++; }
+            try { Demos.setSpeed(10); } catch (_) { rejected++; }
+            return { rejected, same: JSON.stringify(localStorage) === before };
+        }''')
+        self.assertEqual(result, {'rejected': 2, 'same': True})
+
+    def test_existing_owner_conflict_pauses_without_skipping_or_uncaught_errors(self):
+        self.require_demos()
+        errors = []
+        self.page.on('pageerror', lambda error: errors.append(str(error)))
+        self.page.clock.install()
+        self.page.evaluate('''async () => {
+            await CRM.ready;
+            CRM.assignLead('TJHD-001', '李经理（模拟）');
+            await Demos.start('crm');
+        }''')
+        self.page.clock.fast_forward(19000)
+        self.page.clock.fast_forward(19000)
+        self.assertEqual(self.page.locator('#demo-controls').get_attribute('data-step'), 'claim')
+        self.assertIn('其他客户经理', self.page.locator('#demo-controls').inner_text())
+        self.page.locator('#demo-controls').get_by_role('button', name='下一步', exact=True).click()
+        self.assertEqual(self.page.locator('#demo-controls').get_attribute('data-step'), 'claim')
+        self.assertEqual(self.page.evaluate('App.crmState.get().customers.length'), 0)
+        self.assertEqual(errors, [])
 
 
 class CrmFlowTests(UiAcceptanceTests):
