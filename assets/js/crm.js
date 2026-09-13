@@ -10,6 +10,7 @@
   const collections = ['leads', 'customers', 'opportunities', 'tasks', 'quotes', 'contracts', 'orders', 'payments', 'activities'];
   const e = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   const money = value => Number(value || 0).toLocaleString('zh-CN', { style: 'currency', currency: 'CNY' });
+  const formatDuration = seconds => `${Math.floor(Math.max(0, Number(seconds) || 0) / 60)}:${String(Math.floor(Math.max(0, Number(seconds) || 0)) % 60).padStart(2, '0')}`;
   const today = () => new Date().toLocaleDateString('sv-SE');
   const plusDays = days => { const date = new Date(); date.setDate(date.getDate() + days); return date.toLocaleDateString('sv-SE'); };
   const filters = { keyword: '', industry: '', street: '', scale: '', score: '', status: '', source: '', protection: '', sort: 'id' };
@@ -81,9 +82,17 @@
       lead.lastContactAt = today();
       if (!lead.customerId) lead.status = connected ? (payload.result || '需跟进') : '待首呼';
       lead.need = payload.need || lead.need;
+      const durationSeconds = connected ? Math.max(0, Math.floor(Number(payload.durationSeconds) || 0)) : 0;
+      const transcript = connected && Array.isArray(payload.transcript) ? payload.transcript.slice(0, 20).map(line => ({
+        speaker: String(line.speaker || '未知角色').slice(0, 20), text: String(line.text || '').slice(0, 300),
+        atSeconds: Math.max(0, Math.floor(Number(line.atSeconds) || 0))
+      })).filter(line => line.text) : [];
       return event(data, id, 'contact', payload.note || (connected ? '模拟联系已接通' : '模拟联系未接通'), {
         id: payload.id, connected, result: payload.result || (connected ? '需跟进' : '未接通'),
-        need: payload.need || '', objection: payload.objection || '', note: payload.note || '', score: lead.score
+        need: payload.need || '', objection: payload.objection || '', note: payload.note || '', score: lead.score,
+        durationSeconds, recording: connected && payload.recording ? {
+          status: 'completed', durationSeconds, simulated: true
+        } : null, transcript
       });
     },
     createTask(data, id, payload = {}) {
@@ -275,7 +284,13 @@
     const owned = data.leads.filter(l => l.owner);
     return `<section class="panel crm-section"><h3>客户联系工作台</h3><p>仅模拟通话；不会拨打真实电话。请先从公海领取或分配线索。</p>${owned.length ?
       `<div class="crm-inline"><label>选择联系客户<select id="contact-lead">${owned.map(l => `<option value="${e(l.id)}">${e(l.company)} · ${e(l.phone)}</option>`).join('')}</select></label>${button('打开联系面板', 'open-contact')}</div>` : button('前往客户公海', 'go-pool')}
-      <h3>联系记录</h3>${data.activities.filter(a => a.type === 'contact').length ? data.activities.filter(a => a.type === 'contact').slice().reverse().map(a => `<article class="crm-record"><b>${e(find(data, 'leads', a.leadId).company)}</b><p>${e(a.result)} · ${e(a.need)} · ${e(a.note)}</p>${button('查看画像与历史', 'profile', a.leadId)}</article>`).join('') : empty('尚无联系记录。')}</section>`;
+      <h3>联系记录</h3>${data.activities.filter(a => a.type === 'contact').length ? data.activities.filter(a => a.type === 'contact').slice().reverse().map(a => `<article class="crm-record"><b>${e(find(data, 'leads', a.leadId).company)}</b><p>${e(a.result)} · ${e(a.need)} · ${e(a.note)}</p>${a.recording ? `<small>模拟录音 · ${e(formatDuration(a.durationSeconds))} · 转写 ${a.transcript?.length || 0} 段</small>${button('查看录音与转写', 'contact-recording', a.id)}` : ''}${button('查看画像与历史', 'profile', a.leadId)}</article>`).join('') : empty('尚无联系记录。')}</section>`;
+  }
+  function contactRecording(id) {
+    const data = dataNow(); const activity = find(data, 'activities', id);
+    if (activity.type !== 'contact' || !activity.recording) throw new Error('该联系记录没有模拟录音');
+    const lead = find(data, 'leads', activity.leadId);
+    App.openModal(`<article class="crm-recording-detail"><p class="simulation-badge">仅为课堂模拟，不含真实音频或客户信息</p><h2>模拟录音与通话转写</h2><h3>${e(lead.company)}</h3><p>通话时长 ${e(formatDuration(activity.durationSeconds))} · 录音已完成</p><div class="crm-transcript-history">${activity.transcript.map(line => `<p><strong>${e(line.speaker)}</strong><small>${e(formatDuration(line.atSeconds))}</small><span>${e(line.text)}</span></p>`).join('')}</div></article>`);
   }
   function taskPage(data) {
     return `<section class="panel crm-section"><h3>下一次行动</h3><p>按预约日期跟进，可在客户画像中新增任务。</p>${data.tasks.length ? `<div class="crm-record-grid">${data.tasks.map(task => `<article class="crm-record"><span class="status-pill">${e(task.status)}</span><h3>${e(task.title)}</h3><p>${e(task.dueDate)} · ${e(task.owner)}</p><p>${e(task.leadId)}</p>${button('客户画像', 'profile', task.leadId)} ${task.status !== '已完成' ? button('标记完成', 'complete-task', task.id) : ''}</article>`).join('')}</div>` : empty('暂无任务。完成首次联系后可创建 T+2 跟进。')}</section>`;
@@ -337,22 +352,49 @@
     App.openModal(`<article class="crm-profile"><span class="simulation-badge">虚构教学企业 · 联系方式已脱敏</span><h2>${e(lead.company)}</h2><p>${e(lead.id)} · ${e(lead.street)} · ${e(lead.industry)}</p><dl><dt>联系人</dt><dd>${e(lead.contact)} · ${e(lead.phone)}</dd><dt>规模 / 预算</dt><dd>${e(lead.scale)} / ${e(lead.budget)}</dd><dt>推荐产品</dt><dd>${e(lead.opportunity)}</dd><dt>机会信号</dt><dd>${e(lead.signal)}</dd><dt>归属 / 状态</dt><dd>${e(lead.owner || '公海未分配')} / ${e(lead.status)}</dd><dt>模拟来源</dt><dd>${e(lead.leadSource)}</dd><dt>保护期</dt><dd>${e(lead.protectionUntil || '无保护期')}</dd><dt>回收原因</dt><dd>${e(lead.recycleReason || '无')}</dd><dt>最近联系</dt><dd>${e(lead.lastContactAt || '尚未联系')}</dd><dt>推荐动作</dt><dd>${e(lead.nextAction)}</dd></dl><div class="row-actions">${!lead.owner ? button('领取', 'claim', id, 'btn-primary') : ''}${button('模拟拨打', 'contact', id)}${lead.owner ? button('创建跟进任务', 'task', id) + (!lead.customerId ? button('转为客户', 'convert', id) : '') : ''}</div><h3>跟进时间线</h3>${timeline(data, id)}</article>`);
     document.querySelector('#modal-root .modal').classList.add('crm-drawer');
   }
-  function contact(id) {
+  function contact(id, options = {}) {
     const lead = find(dataNow(), 'leads', id);
     let callState = 'idle';
-    openForm('联系客户 · 通用 CRM 模拟', `<p class="simulation-badge">仅演示，不连接真实电话</p><h3>${e(lead.company)}</h3><p>${e(lead.contact)} · ${e(lead.phone)}</p><p>客户画像：${e(lead.industry)} / ${e(lead.street)} / ${e(lead.signal)}</p>${!lead.owner ? '<p>此线索尚未领取。开始模拟拨号时，将先领取到我的线索。</p>' : ''}
-      <p id="crm-call-state" role="status">待模拟拨号</p><div class="row-actions"><button type="button" class="btn" id="crm-dial">开始模拟拨号</button><button type="button" class="btn" id="crm-connect" disabled>模拟接通</button><button type="button" class="btn" id="crm-end" disabled>结束模拟通话</button></div>
+    let dialedDigits = '';
+    let connectedAt = 0;
+    let durationSeconds = 0;
+    let transcript = [];
+    let muted = false;
+    const timers = new Set();
+    const transcriptScript = [
+      { speaker: '客户经理', text: '您好，我是运营商企业服务客户经理，想了解一下贵公司的通信需求。', atSeconds: 1 },
+      { speaker: '客户', text: '我们新门店正在筹备，需要稳定的企业宽带，也要做会员回访。', atSeconds: 2 },
+      { speaker: '客户经理', text: '了解，我会整理企业宽带和工作手机方案，后天再与您确认。', atSeconds: 3 },
+      { speaker: '客户', text: '可以，下午联系我更方便。', atSeconds: 4 }
+    ];
+    const syncTimerCount = () => { window.__crmActiveCallTimers = timers.size; };
+    const later = (callback, delay) => {
+      const timer = setTimeout(() => { timers.delete(timer); syncTimerCount(); callback(); }, delay);
+      timers.add(timer); syncTimerCount(); return timer;
+    };
+    const stopTimers = () => { timers.forEach(timer => { clearTimeout(timer); clearInterval(timer); }); timers.clear(); syncTimerCount(); };
+    openForm('联系客户 · 通用 CRM 模拟', `<p class="simulation-badge">仅演示，不连接真实电话；拨号数字不会保存</p><div class="crm-softphone">
+      <section class="crm-phone-panel" aria-label="模拟拨号键盘"><div class="crm-phone-contact"><span>${e(lead.contact)}</span><strong>${e(lead.phone)}</strong></div><div id="crm-dial-display" aria-live="polite">${e(lead.phone)}</div>
+      <div class="crm-dial-pad">${['1','2','3','4','5','6','7','8','9','*','0','#'].map(key => `<button type="button" class="crm-dial-key" data-dial-key="${e(key)}" aria-label="拨号键 ${e(key)}"><strong>${e(key)}</strong></button>`).join('')}</div>
+      <button type="button" class="btn btn-primary crm-call-button" id="crm-dial">开始模拟拨号</button></section>
+      <section class="crm-call-panel" aria-label="模拟通话状态"><div class="crm-call-identity"><span class="crm-call-avatar" aria-hidden="true">${e(lead.contact.slice(0, 1))}</span><div><h3>${e(lead.company)}</h3><p>${e(lead.contact)} · ${e(lead.phone)}</p></div></div>
+      <div class="crm-call-stage"><p id="crm-call-state" role="status">待模拟拨号</p><strong id="crm-call-duration">00:00</strong><div id="crm-recording-state" class="crm-recording-state">录音未开始</div><div class="crm-waveform" aria-label="模拟通话音量波形">${Array.from({ length: 12 }, (_, index) => `<i class="crm-wave-bar" style="--bar:${(index % 5) + 1}"></i>`).join('')}</div></div>
+      <div class="crm-call-controls"><button type="button" class="btn" id="crm-connect" disabled>模拟接通</button><button type="button" class="btn" id="crm-mute" aria-pressed="false" disabled>静音</button><button type="button" class="btn crm-end-button" id="crm-end" disabled>结束模拟通话</button></div>
+      <div class="crm-live-transcript" id="crm-live-transcript"><div><strong>录音实时转文字</strong><span class="simulation-badge">AI 模拟</span></div><div id="crm-transcript-lines" role="log" aria-live="polite"><p class="crm-transcript-placeholder">接通后将逐句显示模拟转写</p></div></div></section></div>
+      <h3>沟通记录</h3><p>客户画像：${e(lead.industry)} / ${e(lead.street)} / ${e(lead.signal)}</p>${!lead.owner ? '<p>此线索尚未领取。开始模拟拨号时，将先领取到我的线索。</p>' : ''}
       ${select('是否接通', 'connected', ['已接通', '未接通'], '未接通')}${select('沟通结果', 'result', ['需跟进', '已联系', '高意向', '暂无需求'])}
       <label>客户需求<textarea name="need">${e(lead.need)}</textarea></label><label>客户异议<textarea name="objection"></textarea></label><label>沟通备注<textarea name="note" required></textarea></label>
       ${field('线索评分', 'score', lead.score, 'number')}${field('下次跟进日期', 'dueDate', plusDays(2), 'date')}${field('跟进任务', 'title', 'T+2 需求确认与方案沟通')}`,
       '保存联系记录', values => {
-        if (callState === 'idle' || callState === 'dialing') throw new Error('请先完成模拟通话（接通或结束未接通呼叫）');
-        if ((values.connected === '已接通') !== (callState === 'connected' || callState === 'ended-connected')) throw new Error('接通结果需与模拟通话状态一致');
+        if (!callState.startsWith('ended-')) throw new Error('请先结束模拟通话，再保存联系记录');
+        if ((values.connected === '已接通') !== (callState === 'ended-connected')) throw new Error('接通结果需与模拟通话状态一致');
+        const callPayload = { ...values, connected: values.connected === '已接通', durationSeconds,
+          recording: callState === 'ended-connected', transcript };
         // Validate the task before either save, so malformed dates cannot leave a half-saved contact.
         const draft = dataNow();
-        operations.logContact(draft, id, { ...values, connected: values.connected === '已接通' });
+        operations.logContact(draft, id, callPayload);
         if (values.dueDate) operations.createTask(draft, id, values);
-        api.logContact(id, { ...values, connected: values.connected === '已接通' });
+        api.logContact(id, callPayload);
         if (values.dueDate) api.createTask(id, values);
       });
     const form = document.getElementById('crm-operation-form');
@@ -362,25 +404,80 @@
     form.insertAdjacentHTML('beforeend', '<input type="hidden" name="connected" value="未接通">');
     const hiddenConnected = form.querySelector('input[name="connected"]');
     const callLabel = document.getElementById('crm-call-state');
-    document.getElementById('crm-dial').onclick = () => {
+    const timerLabel = document.getElementById('crm-call-duration');
+    const recordingLabel = document.getElementById('crm-recording-state');
+    const transcriptLines = document.getElementById('crm-transcript-lines');
+    const connectButton = document.getElementById('crm-connect');
+    const muteButton = document.getElementById('crm-mute');
+    const endButton = document.getElementById('crm-end');
+    const dialButton = document.getElementById('crm-dial');
+    document.querySelector('#modal-root .modal').classList.add('crm-call-modal');
+    const renderTranscript = () => {
+      transcriptLines.innerHTML = transcript.map(line => `<p class="crm-transcript-line"><strong>${e(line.speaker)}</strong><small>${e(formatDuration(line.atSeconds))}</small><span>${e(line.text)}</span></p>`).join('');
+      transcriptLines.scrollTop = transcriptLines.scrollHeight;
+    };
+    const updateDuration = () => {
+      if (!connectedAt) return;
+      durationSeconds = Math.max(1, Math.floor((Date.now() - connectedAt) / 1000));
+      timerLabel.textContent = formatDuration(durationSeconds).padStart(5, '0');
+    };
+    const dial = () => {
       try {
         if (!find(dataNow(), 'leads', id).owner) api.claimLead(id);
-        callState = 'dialing'; callLabel.textContent = '模拟呼叫中 · ' + lead.phone;
-        document.getElementById('crm-dial').disabled = true;
-        document.getElementById('crm-connect').disabled = false;
-        document.getElementById('crm-end').disabled = false;
+        callState = 'dialing'; callLabel.textContent = '模拟呼叫中 · 对方振铃中';
+        document.querySelector('.crm-call-stage').classList.add('is-ringing');
+        dialButton.disabled = true; connectButton.disabled = false; endButton.disabled = false;
       } catch (error) { form.querySelector('.form-error').textContent = error.message; }
     };
-    document.getElementById('crm-connect').onclick = () => {
-      callState = 'connected'; callLabel.textContent = '模拟已接通 · 请记录沟通结果';
+    const connect = () => {
+      if (callState !== 'dialing') return;
+      callState = 'connected'; callLabel.textContent = '通话中'; connectedAt = Date.now();
+      document.querySelector('.crm-call-stage').classList.remove('is-ringing');
+      document.querySelector('.crm-call-stage').classList.add('is-connected');
       hiddenConnected.value = '已接通'; form.querySelector('select[name="connected"]').value = '已接通';
-      document.getElementById('crm-connect').disabled = true;
+      recordingLabel.textContent = '● 录音中 · 本地模拟';
+      recordingLabel.classList.add('is-recording');
+      connectButton.disabled = true; muteButton.disabled = false;
+      const interval = setInterval(updateDuration, 250); timers.add(interval); syncTimerCount(); updateDuration();
+      transcriptScript.forEach((line, index) => later(() => {
+        if (callState !== 'connected') return;
+        transcript.push({ ...line }); renderTranscript();
+      }, 350 + index * 550));
     };
-    document.getElementById('crm-end').onclick = () => {
+    const end = () => {
+      if (!['dialing', 'connected'].includes(callState)) return;
+      updateDuration();
       callState = callState === 'connected' ? 'ended-connected' : 'ended-unconnected';
-      callLabel.textContent = callState === 'ended-connected' ? '模拟通话已结束 · 已接通' : '模拟通话已结束 · 未接通';
-      document.getElementById('crm-connect').disabled = true; document.getElementById('crm-end').disabled = true;
+      stopTimers();
+      callLabel.textContent = callState === 'ended-connected' ? '模拟通话已结束 · 已接通' : '模拟呼叫已结束 · 未接通';
+      recordingLabel.textContent = callState === 'ended-connected' ? `录音已完成 · ${formatDuration(durationSeconds)}` : '未接通 · 无录音';
+      recordingLabel.classList.remove('is-recording');
+      document.querySelector('.crm-call-stage').classList.remove('is-ringing', 'is-connected');
+      connectButton.disabled = true; muteButton.disabled = true; endButton.disabled = true;
     };
+    dialButton.onclick = dial; connectButton.onclick = connect; endButton.onclick = end;
+    muteButton.onclick = () => {
+      muted = !muted; muteButton.setAttribute('aria-pressed', String(muted));
+      muteButton.textContent = muted ? '取消静音' : '静音';
+    };
+    document.querySelectorAll('[data-dial-key]').forEach(key => {
+      key.onclick = () => {
+        if (callState !== 'idle') return;
+        dialedDigits = (dialedDigits + key.dataset.dialKey).slice(-16);
+        document.getElementById('crm-dial-display').textContent = `模拟输入 · ${dialedDigits}`;
+      };
+    });
+    if (options.autoplay) {
+      const controls = document.getElementById('demo-controls');
+      document.body.classList.add('demo-softphone-open');
+      controls.inert = false; controls.removeAttribute('aria-hidden');
+    }
+    App.registerModalCleanup(() => {
+      stopTimers(); document.body.classList.remove('demo-softphone-open');
+    });
+    if (options.autoplay) {
+      later(dial, 250); later(connect, 950); later(end, 3800);
+    }
   }
   function duplicateDialog() {
     App.openModal('<h2>模拟线索查重</h2><p>按企业名称、门店名称、脱敏号码匹配。脱敏号码命中仅表示需人工核验，不认定真实重复。</p><form id="crm-duplicate-form" class="crm-form"><label>企业名称或脱敏号码<input name="query" required></label><button class="btn btn-primary">开始查重</button></form><div id="crm-duplicate-results" role="status"></div>');
@@ -397,6 +494,7 @@
     if (action === 'go-pool' || action === 'go-deals') { App.navigate('crm', action === 'go-pool' ? 'pool' : 'deals'); return; }
     if (action === 'profile') { profile(id); return; }
     if (action === 'contact') { contact(id); return; }
+    if (action === 'contact-recording') { contactRecording(id); return; }
     if (action === 'open-contact') { contact(document.getElementById('contact-lead').value); return; }
     if (action === 'duplicates') { duplicateDialog(); return; }
     if (action === 'clear-filters') { Object.keys(filters).forEach(key => { filters[key] = key === 'sort' ? 'id' : ''; }); render(activePage); return; }
@@ -447,6 +545,6 @@
       event.preventDefault(); Object.assign(filters, Object.fromEntries(new FormData(event.target))); render(activePage);
     });
   }
-  window.CRM = Object.freeze({ pages, ready, render, bind, currentOwner, ...api });
+  window.CRM = Object.freeze({ pages, ready, render, bind, currentOwner, openContactPanel: contact, ...api });
   bind();
 }());

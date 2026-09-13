@@ -72,8 +72,13 @@
         '先取得沟通许可，确认网络需求，不把拨号等同于有效联系。',
         '记录已接通、汽车展厅专线与组网需求、预算待核实；不拨打真实电话。', () => {
           if (!has('activities', contactId)) CRM.logContact(leadId, { id: contactId, connected: true,
-            need: '专线 + 组网', objection: '预算待核实', note: '教学模拟：确认汽车多区域展厅组网需求，约定 T+2 方案沟通', score: 93 });
-        }),
+            need: '专线 + 组网', objection: '预算待核实', note: '教学模拟：确认汽车多区域展厅组网需求，约定 T+2 方案沟通', score: 93,
+            durationSeconds: 68, recording: true, transcript: [
+              { speaker: '客户经理', text: '您好，想了解一下新展厅的通信需求。', atSeconds: 3 },
+              { speaker: '客户', text: '多个区域需要稳定组网，预算还需要内部确认。', atSeconds: 18 },
+              { speaker: '客户经理', text: '我整理专线与组网方案，后天再沟通。', atSeconds: 42 }
+            ] });
+        }, () => CRM.openContactPanel(leadId, { autoplay: true })),
       s('follow-up', '安排 T+2 需求确认跟进', 'tasks', '.crm-section',
         '把下一步变成有日期、责任人的可执行任务；此处不假装时间已经过去。',
         '新增一条当前日期后 2 天到期的待办，保留待完成状态。', () => {

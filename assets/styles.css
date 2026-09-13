@@ -88,7 +88,9 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .modal { background: white; border-radius: var(--radius); width: min(640px, 100%); max-height: calc(100dvh - 40px); overflow: auto; padding: 24px; box-shadow: 0 18px 60px #17344f33; }
 .modal-close { display: block; margin-left: auto; }
 .modal-content { margin-top: 16px; }
+.modal.crm-call-modal { width: min(920px, 100%); }
 #toast-root { position: fixed; bottom: 24px; right: 24px; max-width: calc(100vw - 48px); z-index: var(--layer-toast); }
+body.demo-softphone-open #demo-controls { z-index: calc(var(--layer-modal) + 1); }
 .toast { background: var(--navy); color: white; padding: 14px 20px; border-radius: 9px; box-shadow: 0 6px 24px #10263e26; }
 .toast.success { background: var(--green); }
 .toast.error { background: var(--red); }
@@ -134,6 +136,42 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .crm-form { display: grid; gap: 16px; }
 .crm-form h3, .crm-form p { margin: 0; line-height: 1.7; }
 .crm-form .form-error { color: var(--red); }
+.crm-softphone { display: grid; grid-template-columns: minmax(210px, .72fr) minmax(300px, 1.28fr); gap: 18px; padding: 16px; border: 1px solid #d7e2ed; border-radius: 12px; background: #f5f8fc; }
+.crm-phone-panel, .crm-call-panel { min-width: 0; border: 1px solid #d8e2ec; border-radius: 12px; background: white; padding: 16px; }
+.crm-phone-contact { text-align: center; display: grid; gap: 4px; color: var(--muted); font-size: 12px; }
+.crm-phone-contact strong { color: var(--text); font-size: 15px; letter-spacing: .04em; }
+#crm-dial-display { min-height: 37px; margin: 12px 0; padding: 9px; border-radius: 7px; background: #eef4fa; color: #214c73; text-align: center; font-weight: 600; overflow-wrap: anywhere; }
+.crm-dial-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.crm-dial-key { aspect-ratio: 1.35; min-height: 42px; border: 1px solid #c9d7e4; border-radius: 50%; background: white; color: var(--navy); cursor: pointer; font-size: 18px; }
+.crm-dial-key:hover { background: #edf5fc; border-color: #77a8d1; }
+.crm-dial-key:focus-visible { outline: 3px solid #63b1ff; outline-offset: 2px; }
+.crm-call-button { width: 100%; margin-top: 12px; }
+.crm-call-identity { display: flex; gap: 12px; align-items: center; }
+.crm-call-identity h3, .crm-call-identity p { margin: 0; }
+.crm-call-identity p { color: var(--muted); font-size: 12px; }
+.crm-call-avatar { width: 44px; height: 44px; flex: 0 0 44px; border-radius: 50%; display: grid; place-items: center; background: #dceafa; color: #185b96; font-weight: 700; }
+.crm-call-stage { display: grid; justify-items: center; gap: 7px; margin: 14px 0; padding: 14px; border-radius: 10px; background: #f2f6fa; }
+.crm-call-stage p { color: var(--text); font-weight: 600; }
+.crm-call-stage > strong { font-variant-numeric: tabular-nums; font-size: 25px; letter-spacing: .08em; }
+.crm-call-stage.is-ringing { box-shadow: inset 0 0 0 2px #8bb7dd; }
+.crm-call-stage.is-connected { background: #edf8f0; }
+.crm-recording-state { color: var(--muted); font-size: 12px; }
+.crm-recording-state.is-recording { color: #c53737; font-weight: 600; }
+.crm-waveform { height: 25px; display: flex; align-items: center; justify-content: center; gap: 3px; }
+.crm-wave-bar { display: block; width: 3px; height: calc(3px + var(--bar) * 3px); border-radius: 3px; background: #9ab3c9; }
+.is-connected .crm-wave-bar { background: #2e9d5b; animation: crm-wave .65s ease-in-out infinite alternate; animation-delay: calc(var(--bar) * -80ms); }
+@keyframes crm-wave { to { height: calc(8px + var(--bar) * 4px); } }
+.crm-call-controls { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.crm-end-button:not(:disabled) { background: #fff1f1; border-color: #df9b9b; color: #a52626; }
+.crm-live-transcript { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+.crm-live-transcript > div:first-child { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+#crm-transcript-lines { max-height: 155px; overflow-y: auto; margin-top: 8px; }
+.crm-transcript-placeholder { color: var(--muted); font-size: 12px; }
+.crm-transcript-line, .crm-transcript-history p { display: grid; grid-template-columns: max-content max-content minmax(0, 1fr); gap: 7px; align-items: start; margin: 0; padding: 9px 0; border-bottom: 1px solid #edf1f5; font-size: 12px; line-height: 1.55; }
+.crm-transcript-line small, .crm-transcript-history small { color: var(--muted); }
+.crm-transcript-line span, .crm-transcript-history span { overflow-wrap: anywhere; }
+.crm-recording-detail > p { color: var(--muted); }
+.crm-transcript-history { margin-top: 18px; }
 .crm-profile dl { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 12px; line-height: 1.8; }
 .crm-profile dt { color: var(--muted); }
 .crm-profile dd { margin: 0; overflow-wrap: anywhere; }
@@ -282,6 +320,13 @@ button:disabled { cursor: not-allowed; opacity: .5; }
   .crm-distribution > div { grid-template-columns: 115px 1fr 20px; }
   .deal-chain { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .crm-inline { flex-direction: column; align-items: stretch; }
+  #modal-root { padding: 8px; }
+  .modal { max-height: calc(100dvh - 16px); padding: 16px; }
+  .crm-softphone { grid-template-columns: 1fr; padding: 10px; }
+  .crm-phone-panel, .crm-call-panel { padding: 13px; }
+  .crm-dial-key { aspect-ratio: 1.75; border-radius: 12px; }
+  .crm-transcript-line, .crm-transcript-history p { grid-template-columns: max-content 1fr; }
+  .crm-transcript-line span, .crm-transcript-history span { grid-column: 1 / -1; }
   .yunxi-analysis-form { grid-template-columns: 1fr; }
   .yunxi-ai-panel { padding: 16px; }
   .yunxi-ai-metrics { gap: 6px; }

@@ -18,6 +18,7 @@
   const nav = document.getElementById('mode-navigation');
   const modalRoot = document.getElementById('modal-root');
   let previousFocus = null;
+  let modalCleanup = null;
   let toastTimer;
   let hasNavigated = false;
   const resetButton = document.querySelector('[data-reset-domain]');
@@ -102,6 +103,9 @@
 
   // Content is trusted, application-generated markup or a DOM node, never raw user input.
   function openModal(content) {
+    if (!modalRoot.hidden && modalCleanup) {
+      const cleanup = modalCleanup; modalCleanup = null; cleanup();
+    }
     if (modalRoot.hidden) previousFocus = document.activeElement;
     modalRoot.innerHTML = '<section class="modal" role="dialog" aria-modal="true" aria-label="教学操作">' +
       '<button type="button" class="modal-close btn" aria-label="关闭弹窗">关闭</button>' +
@@ -116,8 +120,15 @@
     modalRoot.querySelector('.modal-close').focus();
   }
 
+  function registerModalCleanup(cleanup) {
+    modalCleanup = typeof cleanup === 'function' ? cleanup : null;
+  }
+
   function closeModal() {
     if (modalRoot.hidden) return;
+    if (modalCleanup) {
+      const cleanup = modalCleanup; modalCleanup = null; cleanup();
+    }
     modalRoot.hidden = true;
     modalRoot.replaceChildren();
     document.body.classList.remove('modal-open');
@@ -166,7 +177,7 @@
     }
   });
 
-  window.App = Object.freeze({ navigate, renderNavigation, preserveFocus, openModal, closeModal, toast, domains,
+  window.App = Object.freeze({ navigate, renderNavigation, preserveFocus, openModal, closeModal, registerModalCleanup, toast, domains,
     crmState: domains.crm, yunxiState: domains.yunxi });
   document.addEventListener('DOMContentLoaded', () => navigate('crm', 'dashboard'), { once: true });
 }());
